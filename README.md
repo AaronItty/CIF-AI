@@ -1,73 +1,45 @@
-# Welcome to your Lovable project
+# Hybrid SaaS + Service Agentic AI Platform
 
-## Project info
+A structured, modular Agentic AI Platform for MSMEs built with a Strict Controller Architecture, multi-channel support, and an isolated Service layer.
 
-**URL**: https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID
+## System Architecture Overview
 
-## How can I edit this code?
+The system is strictly divided into 4 separated responsibilities to maintain scalability, security, and extensibility.
 
-There are several ways of editing your application.
+### 1. Communication Layer
+Located in `/communication`.
+Handles normalized input/output with various channels (Telegram, Email, Voice Stubs). It passes well-formed data to the Agent Core and does NOT make business logic decisions.
 
-**Use Lovable**
+### 2. Agent Core
+Located in `/agent_core`.
+The "brain" of the platform. Utilizes a while-not-resolved `PlanningLoop`. Incorporates an LLM `ReasoningEngine` to formulate intents, and a deterministic `Controller` to enforce tool permissions and escalation boundaries using the `PolicyEngine`.
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and start prompting.
+### 3. Dashboard + Supabase
+Located in `/dashboard`.
+All state and metadata persistence is routed through `SupabaseClient`. Stores `conversations`, `tool_logs`, `escalations`, and `users`. It also provides data via the `AnalyticsService` for a Frontend Web UI Dashboard.
 
-Changes made via Lovable will be committed automatically to this repo.
+### 4. MCP Server (Service Layer)
+Located in `/mcp_server`.
+The SaaS Core NEVER touches internal company backends or side-effects. Instead, the SaaS Core makes RPC calls over the Model Context Protocol (MCP) to this separate server. The MCP layer hosts integrations (`BaseTool` implementations) and verifies access rights via the `PermissionManager`.
 
-**Use your preferred IDE**
+## Getting Started
 
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
+1. Set environment variables (see `shared/config.py`).
+2. Install pip dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
+3. Run the application:
+   ```bash
+   python app.py
+   ```
 
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
+*(Note: In production deployments, `/mcp_server` and `/app.py` SaaS core should be deployed as separate isolated services.)*
 
-Follow these steps:
+## Documentation
 
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
-```
-
-**Edit a file directly in GitHub**
-
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
-
-**Use GitHub Codespaces**
-
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
-
-## What technologies are used for this project?
-
-This project is built with:
-
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/REPLACE_WITH_PROJECT_ID) and click on Share -> Publish.
-
-## Can I connect a custom domain to my Lovable project?
-
-Yes, you can!
-
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+Full architectural documentation for each subsystem can be found in `/docs`:
+- `01_communication_layer.md`
+- `02_agent_core.md`
+- `03_dashboard_and_supabase.md`
+- `04_mcp_server_and_tools.md`
