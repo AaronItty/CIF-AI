@@ -1,0 +1,43 @@
+{
+  "products": [
+    "id",
+    "store_id",
+    "name",
+    "description",
+    "price",
+    "images",
+    "accepts_custom_note",
+    "product_notice",
+    "is_in_stock",
+    "stock_quantity",
+    "created_at",
+    "updated_at",
+    "category",
+    "min_stock_level",
+    "track_inventory",
+    "status"
+  ],
+  "stores": [
+    "id",
+    "owner_id",
+    "store_name",
+    "store_tagline",
+    "store_url_slug",
+    "logo_url",
+    "theme",
+    "whatsapp_number",
+    "instagram_url",
+    "facebook_url",
+    "about_us",
+    "status",
+    "created_at",
+    "updated_at",
+    "layout_preset",
+    "store_address",
+    "contact_email",
+    "show_email",
+    "show_whatsapp",
+    "show_instagram",
+    "show_facebook"
+  ]
+}
