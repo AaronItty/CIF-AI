@@ -15,7 +15,7 @@ create table documents (
       on delete cascade,
 
   name text not null,
-  storage_path text, -- Path in Supabase Storage
+  storage_path text, -- Nullable to allow ingestion without storage first
   mime_type text,
   file_size_bytes bigint,
 
@@ -27,6 +27,9 @@ create table documents (
   uploaded_by uuid -- Optional: references operators(id)
       references operators(id)
       on delete set null,
+
+  is_active boolean default true,
+  version integer default 1,
 
   uploaded_at timestamptz not null default now(),
   processed_at timestamptz,
