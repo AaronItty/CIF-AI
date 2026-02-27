@@ -15,8 +15,8 @@ class ReasoningEngine:
     def __init__(self, api_key: str):
         self.client = Groq(api_key=api_key)
         # Using a fast reasoning model for intent extraction
-        self.intent_model = "llama3-70b-8192" 
-        self.chat_model = "llama3-70b-8192"
+        self.intent_model = "llama-3.1-8b-instant" 
+        self.chat_model = "llama-3.1-8b-instant"
         
     async def extract_intent(self, text: str, context: List[Dict[str, Any]]) -> dict:
         """
