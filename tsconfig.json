@@ -4,7 +4,7 @@
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./dashboard/frontend/*"]
     },
     "noImplicitAny": false,
     "noUnusedParameters": false,

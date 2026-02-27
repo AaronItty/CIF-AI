@@ -24,8 +24,8 @@
 
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./dashboard/frontend/*"]
     }
   },
-  "include": ["src"]
+  "include": ["dashboard/frontend"]
 }
