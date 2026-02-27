@@ -24,6 +24,9 @@ create index on document_chunks
 using ivfflat (embedding vector_cosine_ops)
 with (lists = 100);
 
+-- Disable RLS for prototype
+alter table document_chunks disable row level security;
+
 -- STEP 7 — Vector Search SQL
 create or replace function match_documents(
     query_embedding vector(768)

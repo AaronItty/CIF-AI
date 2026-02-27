@@ -43,3 +43,6 @@ create trigger documents_updated_at
 create index on documents(organization_id);
 create index on documents(status);
 create index on documents(uploaded_by);
+
+-- Disable RLS for prototype (allows the anon key to insert)
+alter table documents disable row level security;
