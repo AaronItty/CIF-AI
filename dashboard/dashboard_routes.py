@@ -24,12 +24,14 @@ class DashboardRoutes:
 
     def register_routes(self, app):
         @router.get("/files", response_model=List[DocumentResponse])
-        async def get_files(org_id: str = "00000000-0000-0000-0000-000000000000"): # Default org for demo
+        async def get_files():
+            org_id = self.kb_service.get_default_org_id()
             res = self.kb_service.get_documents(org_id)
             return res.data
 
         @router.post("/upload")
-        async def upload_file(file: UploadFile = File(...), org_id: str = "00000000-0000-0000-0000-000000000000"):
+        async def upload_file(file: UploadFile = File(...)):
+            org_id = self.kb_service.get_default_org_id()
             content = await file.read()
             text_content = content.decode("utf-8", errors="ignore")
             
@@ -37,6 +39,7 @@ class DashboardRoutes:
                 doc_id = await self.kb_service.ingest_document(org_id, file.filename, text_content)
                 return {"id": doc_id, "status": "processing"}
             except Exception as e:
+                print(f"API ERROR in /upload: {e}")
                 raise HTTPException(status_code=500, detail=str(e))
 
         @router.delete("/files/{file_id}")

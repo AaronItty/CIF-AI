@@ -22,6 +22,13 @@ class KnowledgeBaseService:
                 break
         return chunks
 
+    def get_default_org_id(self) -> str:
+        """Fetch the first organization from Supabase to use as default."""
+        res = self.db.table("organizations").select("id").limit(1).execute()
+        if res.data:
+            return res.data[0]["id"]
+        raise Exception("No organizations found in database. Please create one first.")
+
     async def ingest_document(self, organization_id: str, name: str, content: str, document_id: str = None):
         """
         Full ingestion pipeline: Save doc -> Chunk -> Embed -> Store Chunks.
