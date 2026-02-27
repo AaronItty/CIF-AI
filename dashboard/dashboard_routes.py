@@ -5,27 +5,44 @@ Provides backend-ready endpoints for the frontend application.
 
 # Example: Using FastAPI or Flask patterns
 
+from fastapi import APIRouter, UploadFile, File, HTTPException
+from pydantic import BaseModel
+from typing import List
+
+router = APIRouter(prefix="/api/kb", tags=["Knowledge Base"])
+
+class DocumentResponse(BaseModel):
+    id: str
+    name: str
+    status: str
+    chunk_count: int
+    created_at: str
+
 class DashboardRoutes:
-    """
-    Registers API routes to expose analytical data and system status.
-    """
-    
-    def __init__(self, analytics: 'AnalyticsService', conversation_repo: 'ConversationRepository'):
-        self.analytics = analytics
-        self.repo = conversation_repo
-        
+    def __init__(self, kb_service: 'KnowledgeBaseService'):
+        self.kb_service = kb_service
+
     def register_routes(self, app):
-        """
-        Register GET/POST handlers for dashboard consumers.
-        
-        Example Routes:
-        - GET /api/stats/escalations
-        - GET /api/conversations/active
-        - POST /api/escalations/{id}/assign
-        """
-        # app.get("/api/stats/escalations")(self.get_escalation_stats)
-        pass
-        
-    async def get_escalation_stats(self):
-        """Endpoint handler: Returning escalation analytics stubs."""
-        pass
+        @router.get("/files", response_model=List[DocumentResponse])
+        async def get_files(org_id: str = "00000000-0000-0000-0000-000000000000"): # Default org for demo
+            res = self.kb_service.get_documents(org_id)
+            return res.data
+
+        @router.post("/upload")
+        async def upload_file(file: UploadFile = File(...), org_id: str = "00000000-0000-0000-0000-000000000000"):
+            content = await file.read()
+            text_content = content.decode("utf-8", errors="ignore")
+            
+            try:
+                doc_id = await self.kb_service.ingest_document(org_id, file.filename, text_content)
+                return {"id": doc_id, "status": "processing"}
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=str(e))
+
+        @router.delete("/files/{file_id}")
+        async def delete_file(file_id: str):
+            self.kb_service.delete_document(file_id)
+            return {"status": "deleted"}
+
+        app.include_router(router)
+
