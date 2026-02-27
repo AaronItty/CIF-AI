@@ -12,9 +12,10 @@ class Controller:
     Evaluates extracted intents and strictly decides the next action.
     """
     
-    def __init__(self, policy_engine: PolicyEngine, mcp_client: Any):
+    def __init__(self, policy_engine: PolicyEngine, mcp_server_url: str, mcp_shared_secret: str):
         self.policy_engine = policy_engine
-        self.mcp_client = mcp_client
+        self.mcp_url = mcp_server_url
+        self.mcp_secret = mcp_shared_secret
         
     async def evaluate(self, intent_data: Dict[str, Any], state: Dict[str, Any]) -> str:
         """
@@ -59,9 +60,25 @@ class Controller:
             tool_name = intent_data.get("action")
             tool_args = intent_data.get("entities", {})
             try:
-                # Delegate entirely to the MCP client barrier
-                # (Assuming mcp_client has a method `call_tool`)
-                tool_output = await self.mcp_client.call_tool(tool_name, tool_args)
+                import httpx
+                
+                # Format exactly as MCP protocol expects over HTTP/SSE bridge
+                payload = {
+                    "method": "tools/call",
+                    "params": {
+                        "name": tool_name,
+                        "arguments": tool_args
+                    }
+                }
+                headers = {"Authorization": f"Bearer {self.mcp_secret}"}
+                
+                async with httpx.AsyncClient() as client:
+                    resp = await client.post(f"{self.mcp_url}/messages", json=payload, headers=headers)
+                    resp.raise_for_status()
+                    # In a real setup, SSE streams the response back, but for simplicity here if it returns OK
+                    # we will assume the HTTP wrapper catches it or we poll a result.
+                    tool_output = resp.json()
+                    
                 result["tool_result"] = tool_output
                 result["status"] = "success"
             except Exception as e:

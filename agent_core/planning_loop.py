@@ -15,6 +15,7 @@ from typing import Dict, Any
 from agent_core.reasoning_engine import ReasoningEngine
 from agent_core.controller import Controller
 from agent_core.state_manager import StateManager
+from communication.schemas.normalized_message import NormalizedMessage
 
 class PlanningLoop:
     """
@@ -26,7 +27,7 @@ class PlanningLoop:
         self.controller = controller
         self.state_manager = state_manager
         
-    async def process_message(self, user_id: str, session_id: str, message: str, channel: str) -> dict:
+    async def process_message(self, normalized_msg: NormalizedMessage) -> dict:
         """
         while not resolved:
             1. Extract intent
@@ -36,12 +37,15 @@ class PlanningLoop:
             5. Update memory
             6. Loop
         """
+        session_id = normalized_msg.session_id
+        message = normalized_msg.message
+        
         # Save the new incoming user message to memory immediately
         await self.state_manager.update_session_state(session_id, {
             "role": "user",
             "content": message,
-            "channel": channel,
-            "user_id": user_id
+            "channel": normalized_msg.channel,
+            "user_id": normalized_msg.user_id
         })
         
         resolved = False

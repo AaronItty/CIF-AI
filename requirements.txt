@@ -4,7 +4,8 @@
 supabase>=2.3.0
 
 # SDK / LLM Integration
-openai>=1.0.0
+groq>=0.11.0
+# openai>=1.0.0
 # anthropic>=0.3.0
 
 # Framework & Communication Channels

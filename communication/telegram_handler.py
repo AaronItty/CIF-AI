@@ -71,5 +71,7 @@ class TelegramHandler(BaseChannelHandler):
 
         response = await self.agent.process_message(normalized)
 
-        if response and response.get("text"):
-            await self.send_message(normalized.session_id, response["text"])
+        if response and response.get("response"):
+            await self.send_message(normalized.session_id, response["response"])
+            
+        return response

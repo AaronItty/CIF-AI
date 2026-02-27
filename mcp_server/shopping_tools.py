@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-SUPABASE_URL = os.getenv("SUPABASE_URL")
-SUPABASE_ANON_KEY = os.getenv("SUPABASE_ANON_KEY")
+SUPABASE_URL = os.getenv("CLIENT_SUPABASE_URL")
+SUPABASE_ANON_KEY = os.getenv("CLIENT_SUPABASE_ANON_KEY")
 
 class SearchItemTool(BaseTool):
     @property

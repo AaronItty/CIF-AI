@@ -36,5 +36,7 @@ dist-ssr
 .env
 test.py
 __pycache__/
+__pycache__
 env/
 .env
+*.pyc

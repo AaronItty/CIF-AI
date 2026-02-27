@@ -3,11 +3,14 @@ Configuration settings for the Agentic AI Platform.
 """
 
 import os
+from dotenv import load_dotenv
+
+load_dotenv()
 
 class Config:
     # Supabase Configuration
-    SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-    SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+    SUPABASE_URL = os.getenv("OUR_SUPABASE_URL", "")
+    SUPABASE_KEY = os.getenv("OUR_SUPABASE_ANON_KEY", "")
     
     # MCP Server Configuration
     MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
