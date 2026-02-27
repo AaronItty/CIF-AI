@@ -31,8 +31,8 @@ create table messages (
                         references organizations(id)
                         on delete cascade,
 
-  -- Conversation relationship
-  conversation_id       uuid not null
+  -- Session relationship
+  session_id       uuid not null
                         references conversations(id)
                         on delete cascade,
 
@@ -66,12 +66,12 @@ create table messages (
 
 -- Indexes
 create index on messages(organization_id);
-create index on messages(conversation_id);
+create index on messages(session_id);
 create index on messages(created_at);
 create index on messages(role);
 create index on messages(type);
 create index on messages(tool_name);
-create index on messages(conversation_id, created_at);
+create index on messages(session_id, created_at);
 
 -- Auto-update updated_at
 create or replace function update_messages_updated_at()
