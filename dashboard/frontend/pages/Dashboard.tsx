@@ -1,17 +1,31 @@
-import { TrendingUp, TrendingDown } from "lucide-react";
-import { kpiData, intentDistribution, cases } from "@/data/mockData";
+import { TrendingUp, TrendingDown, Loader2 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { PieChart, Pie, Cell, ResponsiveContainer, Tooltip, BarChart, Bar, XAxis, YAxis, CartesianGrid } from "recharts";
+import {
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid,
+} from "recharts";
+import { useOrgId, useDashboardStats } from "@/lib/useSupabase";
 
 const statusClass: Record<string, string> = {
-  Open: "status-open",
-  "In Progress": "status-in-progress",
-  Resolved: "status-resolved",
-  Escalated: "status-escalated",
+  active: "status-open",
+  escalated: "status-escalated",
+  resolved: "status-resolved",
+  closed: "status-resolved",
 };
 
 const Dashboard = () => {
   const navigate = useNavigate();
+  const orgId = useOrgId();
+  const { stats, loading } = useDashboardStats(orgId);
+
+  const kpiCards = stats
+    ? [
+      { label: "Total Cases", value: stats.totalConversations.toLocaleString(), trend: "", trendUp: true },
+      { label: "Auto-Resolved", value: stats.autoResolvedPct, trend: "", trendUp: true },
+      { label: "Escalation Rate", value: stats.escalationRatePct, trend: "", trendUp: false },
+      { label: "Active Now", value: stats.activeCount.toLocaleString(), trend: "", trendUp: true },
+    ]
+    : [];
 
   return (
     <div className="space-y-6">
@@ -22,75 +36,99 @@ const Dashboard = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {kpiData.map((kpi) => (
-          <div key={kpi.label} className="kpi-card">
-            <p className="text-sm text-muted-foreground">{kpi.label}</p>
-            <p className="mt-1 text-3xl font-bold text-foreground">{kpi.value}</p>
-            <div className="mt-2 flex items-center gap-1 text-xs">
-              {kpi.trendUp ? (
-                <TrendingUp size={14} className="text-success" />
-              ) : (
-                <TrendingDown size={14} className="text-success" />
-              )}
-              <span className="text-success font-medium">{kpi.trend}</span>
-              <span className="text-muted-foreground">vs last week</span>
+        {loading
+          ? Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="kpi-card animate-pulse">
+              <div className="h-4 w-24 rounded bg-secondary mb-2" />
+              <div className="h-8 w-16 rounded bg-secondary" />
             </div>
-          </div>
-        ))}
+          ))
+          : kpiCards.map((kpi) => (
+            <div key={kpi.label} className="kpi-card">
+              <p className="text-sm text-muted-foreground">{kpi.label}</p>
+              <p className="mt-1 text-3xl font-bold text-foreground">{kpi.value}</p>
+              <div className="mt-2 flex items-center gap-1 text-xs">
+                {kpi.trendUp ? (
+                  <TrendingUp size={14} className="text-success" />
+                ) : (
+                  <TrendingDown size={14} className="text-destructive" />
+                )}
+                <span className="text-muted-foreground">Live data</span>
+              </div>
+            </div>
+          ))}
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* Intent Distribution */}
         <div className="rounded-xl border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Intent Distribution</h3>
-          <ResponsiveContainer width="100%" height={260}>
-            <PieChart>
-              <Pie
-                data={intentDistribution}
-                cx="50%"
-                cy="50%"
-                innerRadius={60}
-                outerRadius={100}
-                paddingAngle={3}
-                dataKey="value"
-              >
-                {intentDistribution.map((entry, index) => (
-                  <Cell key={index} fill={entry.fill} />
+          <h3 className="text-sm font-semibold text-foreground mb-4">Tag Distribution</h3>
+          {loading ? (
+            <div className="flex items-center justify-center h-60">
+              <Loader2 className="animate-spin text-muted-foreground" />
+            </div>
+          ) : stats && stats.intentDistribution.length > 0 ? (
+            <>
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie
+                    data={stats.intentDistribution}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={60}
+                    outerRadius={100}
+                    paddingAngle={3}
+                    dataKey="value"
+                  >
+                    {stats.intentDistribution.map((entry, index) => (
+                      <Cell key={index} fill={entry.fill} />
+                    ))}
+                  </Pie>
+                  <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(220, 13%, 91%)", fontSize: 13 }} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="mt-2 flex flex-wrap gap-4 justify-center">
+                {stats.intentDistribution.map((item) => (
+                  <div key={item.name} className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.fill }} />
+                    {item.name}
+                  </div>
                 ))}
-              </Pie>
-              <Tooltip
-                contentStyle={{ borderRadius: 8, border: "1px solid hsl(220, 13%, 91%)", fontSize: 13 }}
-              />
-            </PieChart>
-          </ResponsiveContainer>
-          <div className="mt-2 flex flex-wrap gap-4 justify-center">
-            {intentDistribution.map((item) => (
-              <div key={item.name} className="flex items-center gap-2 text-xs text-muted-foreground">
-                <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.fill }} />
-                {item.name}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <div className="flex items-center justify-center h-60 text-sm text-muted-foreground italic">
+              No tag data yet. Start conversations and tag them.
+            </div>
+          )}
         </div>
 
-        {/* Skill Usage Preview */}
+        {/* Conversation Status Breakdown */}
         <div className="rounded-xl border bg-card p-5">
-          <h3 className="text-sm font-semibold text-foreground mb-4">Skill Executions (This Month)</h3>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={[
-              { name: "get_order", count: 847 },
-              { name: "check_policy", count: 623 },
-              { name: "create_refund", count: 312 },
-              { name: "replacement", count: 156 },
-              { name: "escalate", count: 98 },
-            ]} layout="vertical" margin={{ left: 10 }}>
-              <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(220, 13%, 91%)" />
-              <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(220, 10%, 46%)" }} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: "hsl(220, 10%, 46%)" }} width={100} />
-              <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(220, 13%, 91%)", fontSize: 13 }} />
-              <Bar dataKey="count" fill="hsl(24, 85%, 52%)" radius={[0, 4, 4, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <h3 className="text-sm font-semibold text-foreground mb-4">Conversation Status Breakdown</h3>
+          {loading ? (
+            <div className="flex items-center justify-center h-60">
+              <Loader2 className="animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            <ResponsiveContainer width="100%" height={280}>
+              <BarChart
+                data={[
+                  { name: "Active", count: stats?.activeCount ?? 0 },
+                  { name: "Resolved", count: stats?.resolvedCount ?? 0 },
+                  { name: "Escalated", count: stats?.escalatedCount ?? 0 },
+                ]}
+                layout="vertical"
+                margin={{ left: 10 }}
+              >
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(220, 13%, 91%)" />
+                <XAxis type="number" tick={{ fontSize: 12, fill: "hsl(220, 10%, 46%)" }} />
+                <YAxis dataKey="name" type="category" tick={{ fontSize: 12, fill: "hsl(220, 10%, 46%)" }} width={80} />
+                <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid hsl(220, 13%, 91%)", fontSize: 13 }} />
+                <Bar dataKey="count" fill="hsl(24, 85%, 52%)" radius={[0, 4, 4, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          )}
         </div>
       </div>
 
@@ -111,43 +149,63 @@ const Dashboard = () => {
               <tr className="border-b bg-secondary/50">
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Case ID</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Customer</th>
-                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Intent</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Channel</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Confidence</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Updated</th>
               </tr>
             </thead>
             <tbody>
-              {cases.slice(0, 5).map((c) => (
-                <tr
-                  key={c.id}
-                  className="cursor-pointer border-b last:border-0 transition-colors hover:bg-secondary/30"
-                  onClick={() => navigate(`/cases/${c.id}`)}
-                >
-                  <td className="px-5 py-3 font-mono text-xs font-medium">{c.id}</td>
-                  <td className="px-5 py-3">{c.customer}</td>
-                  <td className="px-5 py-3 text-muted-foreground">{c.intent}</td>
-                  <td className="px-5 py-3">
-                    <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusClass[c.status]}`}>
-                      {c.status}
-                    </span>
-                  </td>
-                  <td className="px-5 py-3">
-                    <div className="flex items-center gap-2">
-                      <div className="h-1.5 w-16 rounded-full bg-secondary">
-                        <div
-                          className="h-1.5 rounded-full bg-primary"
-                          style={{ width: `${c.confidence}%` }}
-                        />
-                      </div>
-                      <span className="text-xs text-muted-foreground">{c.confidence}%</span>
-                    </div>
-                  </td>
-                  <td className="px-5 py-3 text-xs text-muted-foreground">
-                    {new Date(c.updatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+              {loading ? (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-sm text-muted-foreground">
+                    <Loader2 className="animate-spin mx-auto" />
                   </td>
                 </tr>
-              ))}
+              ) : stats && stats.recentConversations.length > 0 ? (
+                stats.recentConversations.map((c) => (
+                  <tr
+                    key={c.id}
+                    className="cursor-pointer border-b last:border-0 transition-colors hover:bg-secondary/30"
+                    onClick={() => navigate(`/cases/${c.id}`)}
+                  >
+                    <td className="px-5 py-3 font-mono text-xs font-medium">{c.id.slice(0, 8)}…</td>
+                    <td className="px-5 py-3">{c.users?.full_name ?? c.users?.email ?? "—"}</td>
+                    <td className="px-5 py-3 text-muted-foreground capitalize">{c.channels?.type ?? "—"}</td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusClass[c.status] ?? ""}`}>
+                        {c.status}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3">
+                      {c.ai_confidence_score != null ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-1.5 w-16 rounded-full bg-secondary">
+                            <div
+                              className="h-1.5 rounded-full bg-primary"
+                              style={{ width: `${(c.ai_confidence_score * 100).toFixed(0)}%` }}
+                            />
+                          </div>
+                          <span className="text-xs text-muted-foreground">
+                            {(c.ai_confidence_score * 100).toFixed(0)}%
+                          </span>
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-muted-foreground">
+                      {new Date(c.updated_at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </td>
+                  </tr>
+                ))
+              ) : (
+                <tr>
+                  <td colSpan={6} className="py-10 text-center text-sm text-muted-foreground italic">
+                    No conversations yet. Your AI agent cases will appear here.
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
