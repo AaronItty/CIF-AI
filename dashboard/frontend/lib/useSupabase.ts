@@ -49,7 +49,7 @@ export function useOrgId() {
             .from("organizations")
             .select("id")
             .limit(1)
-            .single()
+            .maybeSingle()
             .then(({ data }) => {
                 if (data) setOrgId(data.id);
             });
