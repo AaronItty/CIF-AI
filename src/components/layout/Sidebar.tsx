@@ -8,7 +8,10 @@ import {
   Radio,
   Settings,
   Bot,
+  LogOut,
 } from "lucide-react";
+import { useAuth } from "@/context/AuthContext";
+
 
 const navSections = [
   {
@@ -37,6 +40,15 @@ const navSections = [
 
 const Sidebar = () => {
   const location = useLocation();
+  const { signOut } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      await signOut();
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
+  };
 
   return (
     <aside className="fixed left-0 top-0 z-30 flex h-screen w-60 flex-col border-r border-sidebar-border bg-sidebar">
@@ -55,17 +67,16 @@ const Sidebar = () => {
             <p className="section-label mb-2 px-2">{section.label}</p>
             <ul className="space-y-0.5">
               {section.items.map((item) => {
-                const isActive = location.pathname === item.to || 
+                const isActive = location.pathname === item.to ||
                   (item.to !== "/dashboard" && location.pathname.startsWith(item.to));
                 return (
                   <li key={item.to}>
                     <NavLink
                       to={item.to}
-                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                        isActive
-                          ? "bg-accent text-accent-foreground"
-                          : "text-sidebar-foreground hover:bg-secondary hover:text-foreground"
-                      }`}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${isActive
+                        ? "bg-accent text-accent-foreground"
+                        : "text-sidebar-foreground hover:bg-secondary hover:text-foreground"
+                        }`}
                     >
                       <item.icon size={18} strokeWidth={isActive ? 2 : 1.5} />
                       {item.label}
@@ -80,7 +91,13 @@ const Sidebar = () => {
 
       {/* Footer */}
       <div className="border-t border-sidebar-border px-4 py-3">
-        <p className="text-xs text-muted-foreground">Agentic Platform v1.0</p>
+        <button
+          onClick={handleLogout}
+          className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-sidebar-foreground hover:bg-destructive/10 hover:text-destructive transition-colors"
+        >
+          <LogOut size={18} strokeWidth={1.5} />
+          Sign Out
+        </button>
       </div>
     </aside>
   );
