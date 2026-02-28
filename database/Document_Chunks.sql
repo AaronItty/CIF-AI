@@ -28,20 +28,25 @@ with (lists = 100);
 alter table document_chunks disable row level security;
 
 -- STEP 7 — Vector Search SQL
+-- Enhanced for RAG debugging and production retrieval
 create or replace function match_documents(
-    query_embedding vector(768)
+  query_embedding vector(768),
+  match_threshold float,
+  match_count int
 )
 returns table (
-    content text,
-    similarity float
+  id uuid,
+  content text,
+  similarity float
 )
-language sql
-security definer
+language sql stable
 as $$
-    select
-        content,
-        1 - (embedding <=> query_embedding) as similarity
-    from document_chunks
-    order by embedding <=> query_embedding
-    limit 5;
+  select
+    document_chunks.id,
+    document_chunks.content,
+    1 - (document_chunks.embedding <=> query_embedding) as similarity
+  from document_chunks
+  where 1 - (document_chunks.embedding <=> query_embedding) > match_threshold
+  order by document_chunks.embedding <=> query_embedding
+  limit match_count;
 $$;

@@ -19,4 +19,5 @@ python-dotenv>=1.0.0
 sentence-transformers>=3.0.0
 einops
 torch
+pypdf
 

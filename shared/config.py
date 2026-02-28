@@ -8,7 +8,8 @@ class Config:
 
     # Supabase Configuration
     SUPABASE_URL = os.getenv("SUPABASE_URL") or os.getenv("VITE_SUPABASE_URL", "")
-    SUPABASE_KEY = os.getenv("SUPABASE_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY", "")
+    # Use SERVICE_ROLE_KEY for the backend if available, as it bypasses RLS
+    SUPABASE_KEY = os.getenv("SUPABASE_SERVICE_ROLE_KEY") or os.getenv("SUPABASE_KEY") or os.getenv("VITE_SUPABASE_ANON_KEY", "")
     
     # MCP Server Configuration
     MCP_SERVER_URL = os.getenv("MCP_SERVER_URL", "http://localhost:8000")
