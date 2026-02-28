@@ -15,8 +15,8 @@ const DB_STATUSES = ["All", "active", "escalated", "resolved", "closed"];
 
 const Cases = () => {
   const navigate = useNavigate();
-  const orgId = useOrgId();
-  const { conversations, loading } = useConversations(orgId);
+  const { orgId, orgLoaded } = useOrgId();
+  const { conversations, loading } = useConversations(orgId, orgLoaded);
 
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
@@ -60,8 +60,8 @@ const Cases = () => {
               key={s}
               onClick={() => setStatusFilter(s)}
               className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-colors ${statusFilter === s
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-secondary text-muted-foreground hover:text-foreground"
+                ? "bg-primary text-primary-foreground"
+                : "bg-secondary text-muted-foreground hover:text-foreground"
                 }`}
             >
               {s}

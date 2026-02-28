@@ -15,8 +15,8 @@ const statusClass: Record<string, string> = {
 
 const Dashboard = () => {
   const navigate = useNavigate();
-  const orgId = useOrgId();
-  const { stats, loading } = useDashboardStats(orgId);
+  const { orgId, orgLoaded } = useOrgId();
+  const { stats, loading } = useDashboardStats(orgId, orgLoaded);
 
   const kpiCards = stats
     ? [

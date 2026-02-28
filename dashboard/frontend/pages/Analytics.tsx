@@ -6,8 +6,8 @@ import {
 import { useOrgId, useUsageDaily } from "@/lib/useSupabase";
 
 const Analytics = () => {
-  const orgId = useOrgId();
-  const { usage, loading } = useUsageDaily(orgId, 30);
+  const { orgId, orgLoaded } = useOrgId();
+  const { usage, loading } = useUsageDaily(orgId, orgLoaded, 30);
 
   const conversationsTrend = usage.map((d) => ({
     date: new Date(d.usage_date).toLocaleDateString("en-US", { month: "short", day: "numeric" }),

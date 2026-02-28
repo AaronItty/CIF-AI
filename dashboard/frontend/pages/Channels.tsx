@@ -21,8 +21,8 @@ const typeToLabel: Record<string, string> = {
 const ALL_CHANNEL_TYPES = ["gmail", "telegram", "whatsapp", "webchat", "phone"];
 
 const Channels = () => {
-  const orgId = useOrgId();
-  const { channels, loading } = useChannels(orgId);
+  const { orgId, orgLoaded } = useOrgId();
+  const { channels, loading } = useChannels(orgId, orgLoaded);
 
   // Build a set of connected types for easy lookup
   const connectedTypes = new Set(channels.map((ch) => ch.type));

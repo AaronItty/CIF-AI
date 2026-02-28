@@ -43,6 +43,7 @@ export interface UsageDay {
 
 export function useOrgId() {
     const [orgId, setOrgId] = useState<string | null>(null);
+    const [orgLoaded, setOrgLoaded] = useState(false);
 
     useEffect(() => {
         supabase
@@ -52,10 +53,11 @@ export function useOrgId() {
             .maybeSingle()
             .then(({ data }) => {
                 if (data) setOrgId(data.id);
-            });
+            })
+            .finally(() => setOrgLoaded(true));
     }, []);
 
-    return orgId;
+    return { orgId, orgLoaded };
 }
 
 // ─── useDashboardStats ───────────────────────────────────────────────────────
@@ -78,12 +80,13 @@ const COLORS = [
     "hsl(217, 91%, 60%)",
 ];
 
-export function useDashboardStats(orgId: string | null) {
+export function useDashboardStats(orgId: string | null, orgLoaded: boolean) {
     const [stats, setStats] = useState<DashboardStats | null>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!orgId) return;
+        if (!orgLoaded) return;
+        if (!orgId) { setLoading(false); return; }
 
         const fetchStats = async () => {
             setLoading(true);
@@ -145,12 +148,13 @@ export function useDashboardStats(orgId: string | null) {
 
 // ─── useConversations ────────────────────────────────────────────────────────
 
-export function useConversations(orgId: string | null) {
+export function useConversations(orgId: string | null, orgLoaded = false) {
     const [conversations, setConversations] = useState<Conversation[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!orgId) return;
+        if (!orgLoaded) return;
+        if (!orgId) { setLoading(false); return; }
 
         const fetchAll = async () => {
             setLoading(true);
@@ -175,12 +179,13 @@ export function useConversations(orgId: string | null) {
 
 // ─── useUsageDaily ───────────────────────────────────────────────────────────
 
-export function useUsageDaily(orgId: string | null, daysBack = 30) {
+export function useUsageDaily(orgId: string | null, orgLoaded = false, daysBack = 30) {
     const [usage, setUsage] = useState<UsageDay[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!orgId) return;
+        if (!orgLoaded) return;
+        if (!orgId) { setLoading(false); return; }
 
         const sinceDate = new Date();
         sinceDate.setDate(sinceDate.getDate() - daysBack);
@@ -212,12 +217,13 @@ export function useUsageDaily(orgId: string | null, daysBack = 30) {
 
 // ─── useChannels ─────────────────────────────────────────────────────────────
 
-export function useChannels(orgId: string | null) {
+export function useChannels(orgId: string | null, orgLoaded = false) {
     const [channels, setChannels] = useState<ChannelRow[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!orgId) return;
+        if (!orgLoaded) return;
+        if (!orgId) { setLoading(false); return; }
 
         const fetchChannels = async () => {
             setLoading(true);
