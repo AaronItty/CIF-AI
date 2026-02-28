@@ -8,6 +8,8 @@ This script wires up the dependencies between the 4 architectural pillars:
 4. MCP Server
 """
 
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 import asyncio
 from communication.channel_manager import ChannelManager
 from communication.telegram_handler import TelegramHandler
@@ -18,6 +20,9 @@ from agent_core.controller import Controller
 from agent_core.state_manager import StateManager
 from agent_core.policy_engine import PolicyEngine
 from dashboard.db_client import SupabaseClient
+from dashboard.dashboard_routes import DashboardRoutes
+from agent_core.knowledge_base_service import KnowledgeBaseService
+from agent_core.embeddings import EmbeddingService
 from mcp_server.server import MCPServer
 from mcp_server.tool_registry import ToolRegistry
 from mcp_server.permission_manager import PermissionManager
@@ -32,6 +37,25 @@ async def launch_mcp_server():
 async def launch_saas_core():
     """Starts the main SaaS application."""
     db_client = SupabaseClient()
+    embedding_service = EmbeddingService()
+    kb_service = KnowledgeBaseService(db_client, embedding_service)
+    
+    # Init Dashboard API
+    api_app = FastAPI(title="CIF-AI Dashboard API")
+    api_app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    routes = DashboardRoutes(kb_service)
+    routes.register_routes(api_app)
+    
+    # Run API in background
+    import uvicorn
+    config = uvicorn.Config(api_app, host="0.0.0.0", port=8000)
+    server = uvicorn.Server(config)
+    asyncio.create_task(server.serve())
     
     # Init Core Agent dependencies
     state_manager = StateManager(db_client)
@@ -58,6 +82,8 @@ async def main():
         launch_mcp_server(),
         launch_saas_core()
     )
+    # Keep the event loop running for background servers (FastAPI/MCP)
+    await asyncio.Event().wait()
 
 if __name__ == "__main__":
     asyncio.run(main())

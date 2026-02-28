@@ -23,11 +23,22 @@ class KnowledgeBaseService:
         return chunks
 
     def get_default_org_id(self) -> str:
-        """Fetch the first organization from Supabase to use as default."""
+        """Fetch the first organization or create a default one if none exist."""
         res = self.db.table("organizations").select("id").limit(1).execute()
         if res.data:
             return res.data[0]["id"]
-        raise Exception("No organizations found in database. Please create one first.")
+        
+        # Auto-create a default organization for the prototype/demo
+        print("DEBUG: No organizations found. Creating 'Default Organization'...")
+        res = self.db.table("organizations").insert({
+            "name": "Default Organization",
+            "business_description": "Initial organization for the AI platform."
+        }).execute()
+        
+        if res.data:
+            return res.data[0]["id"]
+            
+        raise Exception("Failed to create or find an organization in the database.")
 
     async def ingest_document(self, organization_id: str, name: str, content: str, document_id: str = None):
         """

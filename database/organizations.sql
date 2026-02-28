@@ -48,3 +48,6 @@ create trigger organizations_updated_at
 -- Index for billing dashboards / filtering active orgs
 create index on organizations(plan);
 create index on organizations(is_active);
+
+-- Disable RLS for prototype
+alter table organizations disable row level security;
