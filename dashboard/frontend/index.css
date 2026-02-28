@@ -112,4 +112,12 @@
   .section-label {
     @apply text-xs font-semibold uppercase tracking-wider text-primary;
   }
+
+  .w-dynamic {
+    width: var(--width, 0%);
+  }
+
+  .bg-dynamic {
+    background-color: var(--bg-color, transparent);
+  }
 }

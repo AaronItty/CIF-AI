@@ -5,6 +5,8 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import { useOrgId, useDashboardStats } from "@/lib/useSupabase";
+import { useEffect } from "react";
+import { generateDailySummary } from "@/lib/reminderTriggers";
 
 const statusClass: Record<string, string> = {
   active: "status-open",
@@ -17,6 +19,12 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { orgId, orgLoaded } = useOrgId();
   const { stats, loading } = useDashboardStats(orgId, orgLoaded);
+
+  useEffect(() => {
+    if (orgId && orgLoaded) {
+      generateDailySummary(orgId);
+    }
+  }, [orgId, orgLoaded]);
 
   const kpiCards = stats
     ? [
@@ -90,7 +98,7 @@ const Dashboard = () => {
               <div className="mt-2 flex flex-wrap gap-4 justify-center">
                 {stats.intentDistribution.map((item) => (
                   <div key={item.name} className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="h-2.5 w-2.5 rounded-full" style={{ background: item.fill }} />
+                    <span className="h-2.5 w-2.5 rounded-full bg-dynamic" style={{ "--bg-color": item.fill } as React.CSSProperties} />
                     {item.name}
                   </div>
                 ))}
@@ -182,8 +190,8 @@ const Dashboard = () => {
                         <div className="flex items-center gap-2">
                           <div className="h-1.5 w-16 rounded-full bg-secondary">
                             <div
-                              className="h-1.5 rounded-full bg-primary"
-                              style={{ width: `${(c.ai_confidence_score * 100).toFixed(0)}%` }}
+                              className="h-1.5 rounded-full bg-primary w-dynamic"
+                              style={{ "--width": `${(c.ai_confidence_score * 100).toFixed(0)}%` } as React.CSSProperties}
                             />
                           </div>
                           <span className="text-xs text-muted-foreground">

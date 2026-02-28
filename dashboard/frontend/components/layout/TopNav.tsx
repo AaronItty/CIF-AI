@@ -1,5 +1,6 @@
-import { Search, Bell } from "lucide-react";
+import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
+import RemindersPopover from "./RemindersPopover";
 
 const TopNav = () => {
   return (
@@ -17,10 +18,7 @@ const TopNav = () => {
             className="h-9 w-56 rounded-lg bg-secondary pl-9 text-sm border-none focus-visible:ring-1 focus-visible:ring-primary"
           />
         </div>
-        <button className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
-          <Bell size={18} />
-          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-primary" />
-        </button>
+        <RemindersPopover />
         <div className="flex items-center gap-2 rounded-lg bg-secondary px-3 py-1.5">
           <div className="h-7 w-7 rounded-full bg-primary flex items-center justify-center text-xs font-semibold text-primary-foreground">
             A

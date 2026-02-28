@@ -245,3 +245,91 @@ export function useChannels(orgId: string | null, orgLoaded = false) {
 
     return { channels, loading };
 }
+
+// ─── useReminders ────────────────────────────────────────────────────────────
+
+export interface Reminder {
+    id: string;
+    type: "escalation" | "system" | "daily_summary" | "priority_case";
+    title: string;
+    description: string | null;
+    link: string | null;
+    is_read: boolean;
+    created_at: string;
+}
+
+export function useReminders(orgId: string | null, orgLoaded = false) {
+    const [reminders, setReminders] = useState<Reminder[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    const fetchReminders = async () => {
+        if (!orgId) return;
+        setLoading(true);
+        try {
+            const { data } = await supabase
+                .from("reminders")
+                .select("*")
+                .eq("organization_id", orgId)
+                .order("created_at", { ascending: false });
+
+            setReminders((data ?? []) as Reminder[]);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        if (!orgLoaded || !orgId) {
+            if (orgLoaded) setLoading(false);
+            return;
+        }
+
+        fetchReminders();
+
+        // Real-time subscription
+        const channel = supabase
+            .channel("reminders_changes")
+            .on(
+                "postgres_changes",
+                {
+                    event: "*",
+                    schema: "public",
+                    table: "reminders",
+                    filter: `organization_id=eq.${orgId}`,
+                },
+                () => {
+                    fetchReminders();
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [orgId, orgLoaded]);
+
+    const markAsRead = async (id: string) => {
+        await supabase.from("reminders").update({ is_read: true }).eq("id", id);
+        setReminders((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, is_read: true } : r))
+        );
+    };
+
+    const markAllAsRead = async () => {
+        if (!orgId) return;
+        await supabase
+            .from("reminders")
+            .update({ is_read: true })
+            .eq("organization_id", orgId)
+            .eq("is_read", false);
+        setReminders((prev) => prev.map((r) => ({ ...r, is_read: true })));
+    };
+
+    const clearAll = async () => {
+        if (!orgId) return;
+        await supabase.from("reminders").delete().eq("organization_id", orgId);
+        setReminders([]);
+    };
+
+    return { reminders, loading, markAsRead, markAllAsRead, clearAll };
+}

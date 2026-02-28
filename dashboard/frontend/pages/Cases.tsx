@@ -122,8 +122,8 @@ const Cases = () => {
                         <div className="flex items-center gap-2">
                           <div className="h-1.5 w-16 rounded-full bg-secondary">
                             <div
-                              className="h-1.5 rounded-full bg-primary"
-                              style={{ width: `${(c.ai_confidence_score * 100).toFixed(0)}%` }}
+                              className="h-1.5 rounded-full bg-primary w-dynamic"
+                              style={{ "--width": `${(c.ai_confidence_score * 100).toFixed(0)}%` } as React.CSSProperties}
                             />
                           </div>
                           <span className="text-xs text-muted-foreground">
