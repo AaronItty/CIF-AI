@@ -29,7 +29,10 @@ const RemindersPopover = () => {
     return (
         <Popover>
             <PopoverTrigger asChild>
-                <button className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground">
+                <button
+                    className="relative flex h-9 w-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+                    title="Notifications"
+                >
                     <Bell size={18} />
                     {unreadCount > 0 && (
                         <span className="absolute right-1.5 top-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
@@ -99,6 +102,7 @@ const RemindersPopover = () => {
                                             <button
                                                 onClick={() => markAsRead(reminder.id)}
                                                 className="h-2 w-2 rounded-full bg-primary"
+                                                title="Mark as read"
                                             />
                                         )}
                                     </div>
