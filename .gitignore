@@ -40,3 +40,5 @@ __pycache__
 env/
 .env
 *.pyc
+token.json
+credentials.json
