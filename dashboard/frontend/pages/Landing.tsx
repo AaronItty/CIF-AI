@@ -107,7 +107,7 @@ const Landing = () => {
                         </h1>
 
                         <p className="text-lg text-gray-300/80 leading-relaxed max-w-lg font-medium">
-                            Your AI-powered robotic assistant built for tomorrow. Orchestrating workflows, managing knowledge, and scaling your potential with zero friction.
+                            Your AI-powered  assistant built for tomorrow. Orchestrating workflows, managing knowledge, and help deal with customer interactions.
                         </p>
 
                         <div className="flex flex-col sm:flex-row gap-4 pt-4">

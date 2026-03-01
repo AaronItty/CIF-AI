@@ -3,7 +3,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   LineChart, Line,
 } from "recharts";
-import { useOrgId, useUsageDaily } from "@/lib/useSupabase";
+import { useOrgId, useUsageDaily } from "@/hooks/useSupabase";
 
 const Analytics = () => {
   const { orgId, orgLoaded } = useOrgId();

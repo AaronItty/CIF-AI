@@ -3,7 +3,7 @@ Repository for conversation persistence.
 Handles all CRUD operations related to conversations and logs.
 """
 
-from dashboard.db_client import SupabaseClient
+from dashboard.backend.db_client import SupabaseClient
 
 class ConversationRepository:
     """

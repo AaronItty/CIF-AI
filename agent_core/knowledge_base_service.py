@@ -5,7 +5,7 @@ import io
 from datetime import datetime
 from pypdf import PdfReader
 from agent_core.embeddings import EmbeddingService
-from dashboard.db_client import SupabaseClient
+from dashboard.backend.db_client import SupabaseClient
 
 class KnowledgeBaseService:
     def __init__(self, db_client: SupabaseClient, embedding_service: EmbeddingService):

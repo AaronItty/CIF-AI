@@ -19,8 +19,8 @@ from agent_core.reasoning_engine import ReasoningEngine
 from agent_core.controller import Controller
 from agent_core.state_manager import StateManager
 from agent_core.policy_engine import PolicyEngine
-from dashboard.db_client import SupabaseClient
-from dashboard.dashboard_routes import DashboardRoutes
+from dashboard.backend.db_client import SupabaseClient
+from dashboard.backend.dashboard_routes import DashboardRoutes
 from agent_core.knowledge_base_service import KnowledgeBaseService
 from agent_core.embeddings import EmbeddingService
 from mcp_server.server import MCPServer

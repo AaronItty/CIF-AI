@@ -3,7 +3,7 @@ Data analytics service.
 Provides aggregation and stats for the Dashboard UI.
 """
 
-from dashboard.db_client import SupabaseClient
+from dashboard.backend.db_client import SupabaseClient
 
 class AnalyticsService:
     """

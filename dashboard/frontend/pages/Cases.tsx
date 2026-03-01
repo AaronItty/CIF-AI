@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Search, Filter, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { useOrgId, useConversations } from "@/lib/useSupabase";
+import { useOrgId, useConversations } from "@/hooks/useSupabase";
 
 const statusClass: Record<string, string> = {
   active: "status-open",
@@ -13,6 +13,29 @@ const statusClass: Record<string, string> = {
 
 const DB_STATUSES = ["All", "active", "escalated", "resolved", "closed"];
 
+const SAMPLE_CASES = [
+  {
+    id: "a1b2c3d4-0000-0000-0000-000000000001",
+    users: { full_name: "Sarah Mitchell", email: "sarah.mitchell@example.com" },
+    channels: { type: "web", display_name: "Web Chat" },
+    status: "active",
+    ai_confidence_score: 0.87,
+    message_count: 6,
+    created_at: new Date(Date.now() - 25 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "b2c3d4e5-0000-0000-0000-000000000002",
+    users: { full_name: "James Okonkwo", email: "james.okonkwo@example.com" },
+    channels: { type: "email", display_name: "Email" },
+    status: "escalated",
+    ai_confidence_score: 0.54,
+    message_count: 11,
+    created_at: new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(),
+    updated_at: new Date(Date.now() - 22 * 60 * 1000).toISOString(),
+  },
+];
+
 const Cases = () => {
   const navigate = useNavigate();
   const { orgId, orgLoaded } = useOrgId();
@@ -21,8 +44,13 @@ const Cases = () => {
   const [statusFilter, setStatusFilter] = useState("All");
   const [search, setSearch] = useState("");
 
+  // Use sample cases when no real data is available yet
+  const effectiveConversations = (!loading && conversations.length === 0)
+    ? SAMPLE_CASES
+    : conversations;
+
   const filtered = useMemo(() => {
-    return conversations.filter((c) => {
+    return effectiveConversations.filter((c) => {
       if (statusFilter !== "All" && c.status !== statusFilter) return false;
       if (search) {
         const q = search.toLowerCase();
@@ -33,7 +61,7 @@ const Cases = () => {
       }
       return true;
     });
-  }, [conversations, statusFilter, search]);
+  }, [effectiveConversations, statusFilter, search]);
 
   return (
     <div className="space-y-6">
@@ -95,9 +123,7 @@ const Cases = () => {
               ) : filtered.length === 0 ? (
                 <tr>
                   <td colSpan={7} className="py-12 text-center text-sm text-muted-foreground italic">
-                    {conversations.length === 0
-                      ? "No cases yet. Cases will appear here once AI conversations start."
-                      : "No cases match your filters."}
+                    No cases match your filters.
                   </td>
                 </tr>
               ) : (

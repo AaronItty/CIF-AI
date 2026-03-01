@@ -1,6 +1,6 @@
 import { Bell, Check, Trash2, ExternalLink, Calendar, AlertCircle, Info, Sparkles } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { useOrgId, useReminders, Reminder } from "@/lib/useSupabase";
+import { useOrgId, useReminders, Reminder } from "@/hooks/useSupabase";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";

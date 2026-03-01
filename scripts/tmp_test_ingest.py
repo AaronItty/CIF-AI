@@ -1,5 +1,5 @@
 import asyncio
-from dashboard.db_client import SupabaseClient
+from dashboard.backend.db_client import SupabaseClient
 from agent_core.embeddings import EmbeddingService
 from agent_core.knowledge_base_service import KnowledgeBaseService
 

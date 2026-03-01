@@ -1,6 +1,6 @@
 import { Mail, MessageCircle, Globe, Phone, CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useOrgId, useChannels } from "@/lib/useSupabase";
+import { useOrgId, useChannels } from "@/hooks/useSupabase";
 
 const typeToIcon: Record<string, typeof Mail> = {
   gmail: Mail,

@@ -4,7 +4,7 @@ import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
-import { useOrgId, useDashboardStats } from "@/lib/useSupabase";
+import { useOrgId, useDashboardStats } from "@/hooks/useSupabase";
 import { useEffect } from "react";
 import { generateDailySummary } from "@/lib/reminderTriggers";
 
@@ -13,6 +13,39 @@ const statusClass: Record<string, string> = {
   escalated: "status-escalated",
   resolved: "status-resolved",
   closed: "status-resolved",
+};
+
+const SAMPLE_CASES = [
+  {
+    id: "a1b2c3d4-0000-0000-0000-000000000001",
+    users: { full_name: "Sarah Mitchell", email: "sarah.mitchell@example.com" },
+    channels: { type: "web" },
+    status: "active",
+    ai_confidence_score: 0.87,
+    updated_at: new Date(Date.now() - 4 * 60 * 1000).toISOString(),
+  },
+  {
+    id: "b2c3d4e5-0000-0000-0000-000000000002",
+    users: { full_name: "James Okonkwo", email: "james.okonkwo@example.com" },
+    channels: { type: "email" },
+    status: "escalated",
+    ai_confidence_score: 0.54,
+    updated_at: new Date(Date.now() - 22 * 60 * 1000).toISOString(),
+  },
+] as const;
+
+const SAMPLE_STATS = {
+  totalConversations: 2,
+  autoResolvedPct: "50%",
+  escalationRatePct: "50%",
+  activeCount: 1,
+  resolvedCount: 0,
+  escalatedCount: 1,
+  intentDistribution: [
+    { name: "Billing", value: 1, fill: "hsl(24, 85%, 52%)" },
+    { name: "Support", value: 1, fill: "hsl(262, 80%, 58%)" },
+  ],
+  recentConversations: SAMPLE_CASES as unknown as typeof SAMPLE_CASES[number][],
 };
 
 const Dashboard = () => {
@@ -26,12 +59,14 @@ const Dashboard = () => {
     }
   }, [orgId, orgLoaded]);
 
-  const kpiCards = stats
+  const effectiveStats = (stats && stats.totalConversations > 0) ? stats : (!loading ? SAMPLE_STATS : null);
+
+  const kpiCards = effectiveStats
     ? [
-      { label: "Total Cases", value: stats.totalConversations.toLocaleString(), trend: "", trendUp: true },
-      { label: "Auto-Resolved", value: stats.autoResolvedPct, trend: "", trendUp: true },
-      { label: "Escalation Rate", value: stats.escalationRatePct, trend: "", trendUp: false },
-      { label: "Active Now", value: stats.activeCount.toLocaleString(), trend: "", trendUp: true },
+      { label: "Total Cases", value: effectiveStats.totalConversations.toLocaleString(), trend: "", trendUp: true },
+      { label: "Auto-Resolved", value: effectiveStats.autoResolvedPct, trend: "", trendUp: true },
+      { label: "Escalation Rate", value: effectiveStats.escalationRatePct, trend: "", trendUp: false },
+      { label: "Active Now", value: effectiveStats.activeCount.toLocaleString(), trend: "", trendUp: true },
     ]
     : [];
 
@@ -75,12 +110,12 @@ const Dashboard = () => {
             <div className="flex items-center justify-center h-60">
               <Loader2 className="animate-spin text-muted-foreground" />
             </div>
-          ) : stats && stats.intentDistribution.length > 0 ? (
+          ) : effectiveStats && effectiveStats.intentDistribution.length > 0 ? (
             <>
               <ResponsiveContainer width="100%" height={260}>
                 <PieChart>
                   <Pie
-                    data={stats.intentDistribution}
+                    data={effectiveStats.intentDistribution}
                     cx="50%"
                     cy="50%"
                     innerRadius={60}
@@ -88,7 +123,7 @@ const Dashboard = () => {
                     paddingAngle={3}
                     dataKey="value"
                   >
-                    {stats.intentDistribution.map((entry, index) => (
+                    {effectiveStats.intentDistribution.map((entry, index) => (
                       <Cell key={index} fill={entry.fill} />
                     ))}
                   </Pie>
@@ -96,7 +131,7 @@ const Dashboard = () => {
                 </PieChart>
               </ResponsiveContainer>
               <div className="mt-2 flex flex-wrap gap-4 justify-center">
-                {stats.intentDistribution.map((item) => (
+                {effectiveStats.intentDistribution.map((item) => (
                   <div key={item.name} className="flex items-center gap-2 text-xs text-muted-foreground">
                     <span className="h-2.5 w-2.5 rounded-full bg-dynamic" style={{ "--bg-color": item.fill } as React.CSSProperties} />
                     {item.name}
@@ -122,9 +157,9 @@ const Dashboard = () => {
             <ResponsiveContainer width="100%" height={280}>
               <BarChart
                 data={[
-                  { name: "Active", count: stats?.activeCount ?? 0 },
-                  { name: "Resolved", count: stats?.resolvedCount ?? 0 },
-                  { name: "Escalated", count: stats?.escalatedCount ?? 0 },
+                  { name: "Active", count: effectiveStats?.activeCount ?? 0 },
+                  { name: "Resolved", count: effectiveStats?.resolvedCount ?? 0 },
+                  { name: "Escalated", count: effectiveStats?.escalatedCount ?? 0 },
                 ]}
                 layout="vertical"
                 margin={{ left: 10 }}
@@ -170,8 +205,9 @@ const Dashboard = () => {
                     <Loader2 className="animate-spin mx-auto" />
                   </td>
                 </tr>
-              ) : stats && stats.recentConversations.length > 0 ? (
-                stats.recentConversations.map((c) => (
+              ) : effectiveStats && effectiveStats.recentConversations.length > 0 ? (
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                (effectiveStats.recentConversations as any[]).map((c: any) => (
                   <tr
                     key={c.id}
                     className="cursor-pointer border-b last:border-0 transition-colors hover:bg-secondary/30"
