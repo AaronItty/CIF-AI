@@ -10,6 +10,7 @@ groq>=0.11.0
 
 # Framework & Communication Channels
 fastapi>=0.100.0
+python-multipart>=0.0.9
 uvicorn>=0.23.0
 python-telegram-bot>=20.0
 sse-starlette>=1.8.2
@@ -21,4 +22,9 @@ supabase>=2.3.0
 
 # General Utilities
 python-dotenv>=1.0.0
-pydantic>=2.0.0
+# AI / Embeddings
+sentence-transformers>=3.0.0
+einops
+torch
+pypdf
+

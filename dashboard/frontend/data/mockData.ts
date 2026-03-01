@@ -1,4 +1,4 @@
-import { Case, Skill, Channel, KPI } from "./types";
+import { Case, Skill, Channel, KPI } from "../types/types";
 
 export const kpiData: KPI[] = [
   { label: "Total Cases", value: "1,284", trend: "+12.5%", trendUp: true },
