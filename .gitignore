@@ -1,3 +1,5 @@
+.env
+venv/
 # Logs
 logs
 *.log
@@ -30,3 +32,13 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+.venv
+.env
+test.py
+__pycache__/
+__pycache__
+env/
+.env
+*.pyc
+token.json
+credentials.json

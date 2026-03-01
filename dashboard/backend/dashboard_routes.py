@@ -5,7 +5,10 @@ Provides backend-ready endpoints for the frontend application.
 
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from agent_core.knowledge_base_service import KnowledgeBaseService
 
 router = APIRouter(prefix="/api/kb", tags=["Knowledge Base"])
 

@@ -4,7 +4,8 @@
 supabase>=2.3.0
 
 # SDK / LLM Integration
-openai>=1.0.0
+groq>=0.11.0
+# openai>=1.0.0
 # anthropic>=0.3.0
 
 # Framework & Communication Channels
@@ -12,6 +13,12 @@ fastapi>=0.100.0
 python-multipart>=0.0.9
 uvicorn>=0.23.0
 python-telegram-bot>=20.0
+sse-starlette>=1.8.2
+
+# Service Layer (MCP)
+mcp>=1.0.0
+httpx>=0.27.0
+supabase>=2.3.0
 
 # General Utilities
 python-dotenv>=1.0.0
