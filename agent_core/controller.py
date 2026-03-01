@@ -29,10 +29,11 @@ class Controller:
         action = intent_data.get("action")
         
         # 2. If no action (tool) is proposed by LLM, just chat/respond
-        if not action or action == "none":
-            # Just to be safe, if confidence is incredibly low even for a basic chat, ask to clarify
-            if not self.policy_engine.evaluate_confidence(intent_data, threshold=0.5):
-                return "ask_clarification"
+        if not action or action == "none" or not self.mcp_url:
+            if not action or action == "none":
+                # Just to be safe, if confidence is incredibly low even for a basic chat, ask to clarify
+                if not self.policy_engine.evaluate_confidence(intent_data, threshold=0.5):
+                    return "ask_clarification"
             return "respond"
             
         # 3. If a tool is proposed, run strict policy checks

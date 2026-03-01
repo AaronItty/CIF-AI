@@ -64,6 +64,7 @@ class PlanningLoop:
             
             # Step 1: Load memory
             memory = await self.state_manager.get_session_state(session_id)
+            print(f"[DEBUG] PlanningLoop: Loaded {len(memory)} messages from memory for session {session_id}")
             
             # Create a simplified state dict for the Policy Engine evaluation
             # (e.g., getting user_role from db, checking consecutive failures, etc)
@@ -111,7 +112,7 @@ class PlanningLoop:
             elif decision == "respond":
                 # Controller says we have all info. We use Groq to generate a final conversational reply
                 resolved = True
-                final_response_text = await self.reasoning.generate_response(original_intent, accumulated_tool_results)
+                final_response_text = await self.reasoning.generate_response(original_intent, accumulated_tool_results, memory)
                 
         # Failsafe breach
         if not resolved:
@@ -119,7 +120,7 @@ class PlanningLoop:
              
         # Save the final AI response to memory
         await self.state_manager.update_session_state(session_id, {
-            "role": "agent",
+            "role": "assistant",
             "content": final_response_text
         })
             

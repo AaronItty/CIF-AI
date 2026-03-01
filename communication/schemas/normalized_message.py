@@ -1,7 +1,6 @@
-from dataclasses import dataclass
+from pydantic import BaseModel
 
-@dataclass
-class NormalizedMessage:
+class NormalizedMessage(BaseModel):
     user_id: str
     session_id: str
     message: str
