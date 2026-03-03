@@ -1,15 +1,38 @@
-from sentence_transformers import SentenceTransformer
+import os
+import requests
 
 class EmbeddingService:
-    def __init__(self, model_name="nomic-ai/nomic-embed-text-v1.5"):
+    def __init__(self, model_name="nomic-embed-text-v1.5"):
         """
         Initializes the Embedding Service with the specified model.
         ✅ STEP 3 — Load Model
         """
-        self.model = SentenceTransformer(
-            model_name,
-            trust_remote_code=True
-        )
+        self.model_name = model_name
+        self.api_key = os.getenv("NOMIC_API_KEY")
+        self.api_url = "https://api-atlas.nomic.ai/v1/embedding/text"
+        
+        if not self.api_key:
+            print("WARNING: NOMIC_API_KEY not found in environment variables. Embedding will fail.")
+
+    def _get_embedding(self, texts: list[str]) -> list[list[float]]:
+        if not self.api_key:
+            raise ValueError("NOMIC_API_KEY is not set.")
+            
+        headers = {
+            "Authorization": f"Bearer {self.api_key}",
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "model": self.model_name,
+            "texts": texts
+        }
+        
+        response = requests.post(self.api_url, headers=headers, json=payload)
+        response.raise_for_status()
+        
+        data = response.json()
+        return data.get("embeddings", [])
 
     def embed_document(self, text: str):
         """
@@ -17,8 +40,8 @@ class EmbeddingService:
         ✅ STEP 4 — Generate Document Embeddings
         """
         prefixed = f"search_document: {text}"
-        embedding = self.model.encode(prefixed)
-        return embedding.tolist()
+        embeddings = self._get_embedding([prefixed])
+        return embeddings[0] if embeddings else []
 
     def embed_query(self, query: str):
         """
@@ -26,5 +49,5 @@ class EmbeddingService:
         ✅ STEP 6 — Embed User Queries
         """
         prefixed = f"search_query: {query}"
-        embedding = self.model.encode(prefixed)
-        return embedding.tolist()
+        embeddings = self._get_embedding([prefixed])
+        return embeddings[0] if embeddings else []

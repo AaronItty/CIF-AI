@@ -72,3 +72,6 @@ env/
 *.pyc
 token.json
 credentials.json
+
+
+tmp_test_*.txt
