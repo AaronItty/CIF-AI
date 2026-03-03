@@ -144,6 +144,80 @@ async def get_case_detail(case_id: str):
         return conv
     raise HTTPException(status_code=404, detail="Case not found")
 
+# --- Channel Connect/Disconnect Endpoints ---
+
+class ChannelConnectRequest(BaseModel):
+    organization_id: str
+    type: str  # gmail, telegram, whatsapp, webchat, phone
+    display_name: Optional[str] = None
+    config: Optional[dict] = None  # channel-specific config (bot token, credentials path, etc.)
+
+@dashboard_router.post("/channels/connect")
+async def connect_channel(req: ChannelConnectRequest):
+    """
+    Connect a channel: validate credentials/config, then register in DB.
+    """
+    import os
+    from datetime import datetime
+
+    # Channel-specific validation
+    if req.type == "gmail":
+        # Check if credentials.json exists (OAuth app configured)
+        creds_path = req.config.get("credentials_path", "credentials.json") if req.config else "credentials.json"
+        token_path = req.config.get("token_path", "token.json") if req.config else "token.json"
+
+        if not os.path.exists(creds_path):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Gmail OAuth credentials file '{creds_path}' not found. Please download it from Google Cloud Console first."
+            )
+
+        # If token.json doesn't exist, we need to trigger OAuth flow
+        if not os.path.exists(token_path):
+            try:
+                from google_auth_oauthlib.flow import InstalledAppFlow
+                SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
+                flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
+                creds = flow.run_local_server(port=0)
+                with open(token_path, 'w') as token:
+                    token.write(creds.to_json())
+            except Exception as e:
+                raise HTTPException(status_code=500, detail=f"Gmail OAuth flow failed: {str(e)}")
+
+    elif req.type == "telegram":
+        bot_token = (req.config or {}).get("bot_token") or os.getenv("TELEGRAM_BOT_TOKEN")
+        if not bot_token:
+            raise HTTPException(
+                status_code=400,
+                detail="Telegram Bot Token is required. Provide it in config or set TELEGRAM_BOT_TOKEN env var."
+            )
+
+    # Upsert channel row in DB
+    channel_data = {
+        "organization_id": req.organization_id,
+        "type": req.type,
+        "display_name": req.display_name or req.type.capitalize(),
+        "status": "active",
+        "last_active_at": datetime.utcnow().isoformat(),
+    }
+
+    res = _db_client.table("channels").upsert(
+        channel_data,
+        on_conflict="organization_id,type"
+    ).execute()
+
+    return {"status": "connected", "channel": res.data}
+
+@dashboard_router.delete("/channels/{channel_id}/disconnect")
+async def disconnect_channel(channel_id: str):
+    """
+    Disconnect a channel: set status to inactive or delete the row.
+    """
+    res = _db_client.table("channels").update({"status": "inactive"}).eq("id", channel_id).execute()
+    if not res.data:
+        raise HTTPException(status_code=404, detail="Channel not found")
+    return {"status": "disconnected"}
+
 # --- KB Route Implementations ---
 
 @router.get("/files", response_model=List[DocumentResponse])

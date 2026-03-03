@@ -38,4 +38,4 @@ dashboard_routes.register_routes(app)
 
 if __name__ == "__main__":
     print("▶ Starting Dedicated Knowledge Base API on port 8000...")
-    uvicorn.run("run_kb_service:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app-service:app", host="0.0.0.0", port=8000, reload=True)
