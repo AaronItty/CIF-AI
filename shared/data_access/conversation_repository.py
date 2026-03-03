@@ -1,9 +1,11 @@
 """
 Repository for conversation persistence.
 Handles all CRUD operations related to conversations and logs.
+
+Canonical location: shared.data_access.conversation_repository
 """
 
-from dashboard.backend.db_client import SupabaseClient
+from shared.data_access.db_client import SupabaseClient
 import uuid
 
 def _make_uuid(session_id: str) -> str:
@@ -105,4 +107,3 @@ class ConversationRepository:
         except Exception:
             pass # Fallback if table doesn't exist yet
         return [payload]
-
