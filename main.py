@@ -5,7 +5,7 @@ from fastapi import FastAPI, Request
 from contextlib import asynccontextmanager
 import uvicorn
 
-from dashboard.backend.db_client import SupabaseClient
+from shared.data_access.db_client import SupabaseClient
 from dashboard.conversation_repository import ConversationRepository
 from dashboard.analytics_service import AnalyticsService
 from dashboard.dashboard_routes import DashboardRoutes
