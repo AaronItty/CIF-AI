@@ -1,6 +1,9 @@
+import { useState } from "react";
 import { Mail, MessageCircle, Globe, Phone, CheckCircle, XCircle, Loader2, AlertCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useOrgId, useChannels } from "@/hooks/useSupabase";
+
+const API_BASE = "http://localhost:8000/api/dashboard";
 
 const typeToIcon: Record<string, typeof Mail> = {
   gmail: Mail,
@@ -23,6 +26,7 @@ const ALL_CHANNEL_TYPES = ["gmail", "telegram", "whatsapp", "webchat", "phone"];
 const Channels = () => {
   const { orgId, orgLoaded } = useOrgId();
   const { channels, loading } = useChannels(orgId, orgLoaded);
+  const [connectingType, setConnectingType] = useState<string | null>(null);
 
   // Build a set of connected types for easy lookup
   const connectedTypes = new Set(channels.map((ch) => ch.type));
@@ -39,6 +43,56 @@ const Channels = () => {
       id: dbChannel?.id ?? null,
     };
   });
+
+  const handleConnect = async (type: string) => {
+    if (!orgId) return;
+    setConnectingType(type);
+    try {
+      const res = await fetch(`${API_BASE}/channels/connect`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organization_id: orgId,
+          type,
+          display_name: typeToLabel[type] ?? type,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        alert(`Connection failed: ${err.detail}`);
+      } else {
+        // Reload the page to refresh channel list
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error("Error connecting channel:", err);
+      alert("Failed to connect channel. Is the backend running?");
+    } finally {
+      setConnectingType(null);
+    }
+  };
+
+  const handleDisconnect = async (channelId: string | null) => {
+    if (!channelId) return;
+    setConnectingType(channelId);
+    try {
+      const res = await fetch(`${API_BASE}/channels/${channelId}/disconnect`, {
+        method: "DELETE",
+      });
+
+      if (res.ok) {
+        window.location.reload();
+      } else {
+        const err = await res.json();
+        alert(`Disconnect failed: ${err.detail}`);
+      }
+    } catch (err) {
+      console.error("Error disconnecting channel:", err);
+    } finally {
+      setConnectingType(null);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -57,6 +111,7 @@ const Channels = () => {
             const Icon = typeToIcon[ch.type] ?? Globe;
             const connected = ch.status === "active";
             const hasError = ch.status === "error";
+            const isProcessing = connectingType !== null && (connectingType === ch.type || connectingType === ch.id);
 
             return (
               <div key={ch.type} className="flex items-center justify-between rounded-xl border bg-card p-5">
@@ -96,9 +151,25 @@ const Channels = () => {
                     </div>
                   </div>
                 </div>
-                <Button variant={connected ? "outline" : "default"} size="sm">
-                  {connected ? "Configure" : "Connect"}
-                </Button>
+                {connected ? (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    disabled={!!isProcessing}
+                    onClick={() => handleDisconnect(ch.id)}
+                  >
+                    {isProcessing ? <Loader2 size={14} className="animate-spin" /> : "Disconnect"}
+                  </Button>
+                ) : (
+                  <Button
+                    variant="default"
+                    size="sm"
+                    disabled={!!isProcessing}
+                    onClick={() => handleConnect(ch.type)}
+                  >
+                    {isProcessing ? <Loader2 size={14} className="animate-spin" /> : "Connect"}
+                  </Button>
+                )}
               </div>
             );
           })}

@@ -3,7 +3,7 @@ Escalation routing module.
 Handles routing the conversation to a human operator when the Agent Core triggers an escalation.
 """
 
-from dashboard.backend.db_client import SupabaseClient
+from shared.data_access.db_client import SupabaseClient
 
 class EscalationRouter:
     """

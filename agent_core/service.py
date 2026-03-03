@@ -8,8 +8,8 @@ from agent_core.controller import Controller
 from agent_core.state_manager import StateManager
 from agent_core.policy_engine import PolicyEngine
 from agent_core.planning_loop import PlanningLoop
-from dashboard.backend.db_client import SupabaseClient
-from dashboard.backend.conversation_repository import ConversationRepository
+from shared.data_access.db_client import SupabaseClient
+from shared.data_access.conversation_repository import ConversationRepository
 from communication.schemas.normalized_message import NormalizedMessage
 
 load_dotenv()
