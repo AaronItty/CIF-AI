@@ -1,0 +1,49 @@
+﻿
+==================================================
+SIPPING SWEETCRUMBS KB TEST
+==================================================
+Target Org ID: 302945a7-2a4b-4b78-a764-daa12777fbaf
+
+[1/3] Ingesting SweetCrumbs Knowledge Base...
+DEBUG: Uploading SweetCrumbs_Policy.txt to storage...
+DEBUG: No numbered sections found, falling back to window chunking.
+DEBUG: Created 3 semantic chunks
+DEBUG: Embedding chunk 0...
+DEBUG: Inserting chunk 0 to DB...
+DEBUG: Embedding chunk 1...
+DEBUG: Inserting chunk 1 to DB...
+DEBUG: Embedding chunk 2...
+DEBUG: Inserting chunk 2 to DB...
+DEBUG: Ingestion successful
+DONE: Document Ingested (ID: 46535b72-4fca-4018-8377-920dae41d0b3)
+DEBUG: Chunks in DB: [{'count': 3}]
+
+[2/3] Running Valid Query Suite (Expected: Relevant Results)...
+
+QUERY: 'What is the refund policy?'
+DEBUG: Searching KB for: What is the refund policy? (Limit: 3)
+VECTOR SEARCH RESULTS (0 matches): []
+FAIL: No results found for valid query.
+
+QUERY: 'How long does delivery take for metro cities?'
+DEBUG: Searching KB for: How long does delivery take for metro cities? (Limit: 3)
+VECTOR SEARCH RESULTS (0 matches): []
+FAIL: No results found for valid query.
+
+QUERY: 'What are the shipping charges?'
+DEBUG: Searching KB for: What are the shipping charges? (Limit: 3)
+VECTOR SEARCH RESULTS (0 matches): []
+FAIL: No results found for valid query.
+
+QUERY: 'Can I cancel my order after 2 hours?'
+DEBUG: Searching KB for: Can I cancel my order after 2 hours? (Limit: 3)
+VECTOR SEARCH RESULTS (3 matches): [{'id': '465abe1a-9aee-4cac-bd03-e4f08af86f6c', 'content': 'we do not accept returns. However, if you receive a damaged or incorrect order, please contact support within 24 hours of delivery with photo evidence for a full refund or replacement.# Order Cancellation PolicyYou can cancel your order within 2 hours of placement. Since baking starts shortly after, we cannot accept cancellations once the preparation process has begun.# Allergy & Ingredient InformationOur cookies contain wheat, butter, and sugar. Some varieties contain nuts (almonds, walnuts, hazelnuts). All our products are baked in a facility that handles nuts and dairy. Please check the individual product page for specific allergen details.# Product Shelf LifeOur cookies have a shelf life of 15 days when stored in an airtight container in a cool, dry place. For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at', 'similarity': 0.678246415412784}, {'id': '37e1dec1-d42f-4aab-890e-7c34ac2c86cb', 'content': 'we do not accept returns. However, if you receive a damaged or incorrect order, please contact support within 24 hours of delivery with photo evidence for a full refund or replacement.# Order Cancellation PolicyYou can cancel your order within 2 hours of placement. Since baking starts shortly after, we cannot accept cancellations once the preparation process has begun.# Allergy & Ingredient InformationOur cookies contain wheat, butter, and sugar. Some varieties contain nuts (almonds, walnuts, hazelnuts). All our products are baked in a facility that handles nuts and dairy. Please check the individual product page for specific allergen details.# Product Shelf LifeOur cookies have a shelf life of 15 days when stored in an airtight container in a cool, dry place. For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at', 'similarity': 0.678246415412784}, {'id': 'e0c056ca-6349-4dbb-8902-b478577e6f5a', 'content': 'packaging to maintain freshness. 4. Refund & Return Policy Due to the perishable nature of cookies, returns are not accepted. However, refunds are issued in the following cases: - Damaged packaging - Incorrect product delivered - Order not delivered within 7 business days Refunds are processed within 3û5 business days. Customers must provide photo evidence within 24 hours of delivery. 5. Order Cancellation Policy Orders can be cancelled within 2 hours of placing the order. After 2 hours, cancellation is not guaranteed as baking may have started. If cancellation is approved, refunds are processed within 3 business days. 6. Allergy & Ingredient Information Our cookies may contain: - Gluten - Dairy - Nuts - Soy We cannot guarantee a nut-free facility. Customers with severe allergies are advised to contact support before placing orders. Ingredient lists are available on each product page. 7. Product Shelf Life Our cookies remain fresh for:', 'similarity': 0.655442519465994}]
+  - Score: 0.6782 | Chunk: we do not accept returns. However, if you receive a damaged or incorrect order, please contact suppo...
+  - Score: 0.6782 | Chunk: we do not accept returns. However, if you receive a damaged or incorrect order, please contact suppo...
+  - Score: 0.6554 | Chunk: packaging to maintain freshness. 4. Refund & Return Policy Due to the perishable nature of cookies,...
+PASS: Found relevant content above threshold 0.5
+
+QUERY: 'What allergens are present in the cookies?'
+DEBUG: Searching KB for: What allergens are present in the cookies? (Limit: 3)
+VECTOR SEARCH RESULTS (3 matches): 
+TEST CRASHED: 'charmap' codec can't encode character '\u20b9' in position 2742: character maps to <undefined>

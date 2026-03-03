@@ -1,0 +1,94 @@
+﻿
+==================================================
+SIPPING SWEETCRUMBS KB TEST
+==================================================
+Target Org ID: 302945a7-2a4b-4b78-a764-daa12777fbaf
+
+[1/3] Ingesting SweetCrumbs Knowledge Base...
+DEBUG: Uploading SweetCrumbs_Policy.txt to storage...
+DEBUG: No numbered sections found, falling back to window chunking.
+DEBUG: Created 3 semantic chunks
+DEBUG: Embedding chunk 0...
+DEBUG: Inserting chunk 0 to DB...
+DEBUG: Embedding chunk 1...
+DEBUG: Inserting chunk 1 to DB...
+DEBUG: Embedding chunk 2...
+DEBUG: Inserting chunk 2 to DB...
+DEBUG: Ingestion successful
+DONE: Document Ingested (ID: 25dac006-bea0-4750-9fcf-4a61d7b91cb4)
+DEBUG: Chunks in DB: [{'count': 3}]
+
+[2/3] Running Valid Query Suite (Expected: Relevant Results)...
+
+QUERY: 'What is the refund policy?'
+DEBUG: Searching KB for: What is the refund policy? (Limit: 3)
+VECTOR SEARCH RESULTS (0 matches): []
+FAIL: No results found for valid query.
+
+QUERY: 'How long does delivery take for metro cities?'
+DEBUG: Searching KB for: How long does delivery take for metro cities? (Limit: 3)
+VECTOR SEARCH RESULTS (0 matches): []
+FAIL: No results found for valid query.
+
+QUERY: 'What are the shipping charges?'
+DEBUG: Searching KB for: What are the shipping charges? (Limit: 3)
+VECTOR SEARCH RESULTS (0 matches): []
+FAIL: No results found for valid query.
+
+QUERY: 'Can I cancel my order after 2 hours?'
+DEBUG: Searching KB for: Can I cancel my order after 2 hours? (Limit: 3)
+VECTOR SEARCH RESULTS (3 matches): [{'id': '465abe1a-9aee-4cac-bd03-e4f08af86f6c', 'content': 'we do not accept returns. However, if you receive a damaged or incorrect order, please contact support within 24 hours of delivery with photo evidence for a full refund or replacement.# Order Cancellation PolicyYou can cancel your order within 2 hours of placement. Since baking starts shortly after, we cannot accept cancellations once the preparation process has begun.# Allergy & Ingredient InformationOur cookies contain wheat, butter, and sugar. Some varieties contain nuts (almonds, walnuts, hazelnuts). All our products are baked in a facility that handles nuts and dairy. Please check the individual product page for specific allergen details.# Product Shelf LifeOur cookies have a shelf life of 15 days when stored in an airtight container in a cool, dry place. For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at', 'similarity': 0.678246415412784}, {'id': '37e1dec1-d42f-4aab-890e-7c34ac2c86cb', 'content': 'we do not accept returns. However, if you receive a damaged or incorrect order, please contact support within 24 hours of delivery with photo evidence for a full refund or replacement.# Order Cancellation PolicyYou can cancel your order within 2 hours of placement. Since baking starts shortly after, we cannot accept cancellations once the preparation process has begun.# Allergy & Ingredient InformationOur cookies contain wheat, butter, and sugar. Some varieties contain nuts (almonds, walnuts, hazelnuts). All our products are baked in a facility that handles nuts and dairy. Please check the individual product page for specific allergen details.# Product Shelf LifeOur cookies have a shelf life of 15 days when stored in an airtight container in a cool, dry place. For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at', 'similarity': 0.678246415412784}, {'id': 'b364e38d-8793-4b7d-aa23-4803f65ba8ff', 'content': 'we do not accept returns. However, if you receive a damaged or incorrect order, please contact support within 24 hours of delivery with photo evidence for a full refund or replacement.# Order Cancellation PolicyYou can cancel your order within 2 hours of placement. Since baking starts shortly after, we cannot accept cancellations once the preparation process has begun.# Allergy & Ingredient InformationOur cookies contain wheat, butter, and sugar. Some varieties contain nuts (almonds, walnuts, hazelnuts). All our products are baked in a facility that handles nuts and dairy. Please check the individual product page for specific allergen details.# Product Shelf LifeOur cookies have a shelf life of 15 days when stored in an airtight container in a cool, dry place. For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at', 'similarity': 0.678246415412784}]
+  - Score: 0.6782 | Chunk: we do not accept returns. However, if you receive a damaged or incorrect order, please contact suppo...
+  - Score: 0.6782 | Chunk: we do not accept returns. However, if you receive a damaged or incorrect order, please contact suppo...
+  - Score: 0.6782 | Chunk: we do not accept returns. However, if you receive a damaged or incorrect order, please contact suppo...
+PASS: Found relevant content above threshold 0.5
+
+QUERY: 'What allergens are present in the cookies?'
+DEBUG: Searching KB for: What allergens are present in the cookies? (Limit: 3)
+VECTOR SEARCH RESULTS (3 matches): [{'id': '465abe1a-9aee-4cac-bd03-e4f08af86f6c', 'content': 'we do not accept returns. However, if you receive a damaged or incorrect order, please contact support within 24 hours of delivery with photo evidence for a full refund or replacement.# Order Cancellation PolicyYou can cancel your order within 2 hours of placement. Since baking starts shortly after, we cannot accept cancellations once the preparation process has begun.# Allergy & Ingredient InformationOur cookies contain wheat, butter, and sugar. Some varieties contain nuts (almonds, walnuts, hazelnuts). All our products are baked in a facility that handles nuts and dairy. Please check the individual product page for specific allergen details.# Product Shelf LifeOur cookies have a shelf life of 15 days when stored in an airtight container in a cool, dry place. For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at', 'similarity': 0.755815293566916}, {'id': '37e1dec1-d42f-4aab-890e-7c34ac2c86cb', 'content': 'we do not accept returns. However, if you receive a damaged or incorrect order, please contact support within 24 hours of delivery with photo evidence for a full refund or replacement.# Order Cancellation PolicyYou can cancel your order within 2 hours of placement. Since baking starts shortly after, we cannot accept cancellations once the preparation process has begun.# Allergy & Ingredient InformationOur cookies contain wheat, butter, and sugar. Some varieties contain nuts (almonds, walnuts, hazelnuts). All our products are baked in a facility that handles nuts and dairy. Please check the individual product page for specific allergen details.# Product Shelf LifeOur cookies have a shelf life of 15 days when stored in an airtight container in a cool, dry place. For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at', 'similarity': 0.755815293566916}, {'id': 'b364e38d-8793-4b7d-aa23-4803f65ba8ff', 'content': 'we do not accept returns. However, if you receive a damaged or incorrect order, please contact support within 24 hours of delivery with photo evidence for a full refund or replacement.# Order Cancellation PolicyYou can cancel your order within 2 hours of placement. Since baking starts shortly after, we cannot accept cancellations once the preparation process has begun.# Allergy & Ingredient InformationOur cookies contain wheat, butter, and sugar. Some varieties contain nuts (almonds, walnuts, hazelnuts). All our products are baked in a facility that handles nuts and dairy. Please check the individual product page for specific allergen details.# Product Shelf LifeOur cookies have a shelf life of 15 days when stored in an airtight container in a cool, dry place. For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at', 'similarity': 0.755815293566916}]
+  - Score: 0.7558 | Chunk: we do not accept returns. However, if you receive a damaged or incorrect order, please contact suppo...
+  - Score: 0.7558 | Chunk: we do not accept returns. However, if you receive a damaged or incorrect order, please contact suppo...
+  - Score: 0.7558 | Chunk: we do not accept returns. However, if you receive a damaged or incorrect order, please contact suppo...
+PASS: Found relevant content above threshold 0.5
+
+QUERY: 'What are the support hours?'
+DEBUG: Searching KB for: What are the support hours? (Limit: 3)
+VECTOR SEARCH RESULTS (0 matches): []
+FAIL: No results found for valid query.
+
+QUERY: 'How does the SweetPoints loyalty program work?'
+DEBUG: Searching KB for: How does the SweetPoints loyalty program work? (Limit: 3)
+VECTOR SEARCH RESULTS (3 matches): [{'id': '52ab8d7e-8e0f-42b3-8734-8b6eb0e65a0e', 'content': 'For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at bulk@sweetcrumbs.in for customized packaging and discounted pricing for orders above 50 boxes.# Loyalty Program ΓÇô SweetPointsEarn 1 SweetPoint for every Γé╣10 spent. SweetPoints can be redeemed for discounts on future orders. 100 SweetPoints = Γé╣50 discount. Points are valid for 12 months from the date of earning.# Customer SupportOur support team is available Monday to Saturday, 10 AM to 7 PM IST. You can reach us via email at support@sweetcrumbs.in or via WhatsApp at +91-9876543210.', 'similarity': 0.769463741965216}, {'id': '6923d263-ec8e-46e4-bf8a-91580bd5cd05', 'content': 'For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at bulk@sweetcrumbs.in for customized packaging and discounted pricing for orders above 50 boxes.# Loyalty Program ΓÇô SweetPointsEarn 1 SweetPoint for every Γé╣10 spent. SweetPoints can be redeemed for discounts on future orders. 100 SweetPoints = Γé╣50 discount. Points are valid for 12 months from the date of earning.# Customer SupportOur support team is available Monday to Saturday, 10 AM to 7 PM IST. You can reach us via email at support@sweetcrumbs.in or via WhatsApp at +91-9876543210.', 'similarity': 0.769463741965216}, {'id': '20946e79-dfbe-4dc4-b978-e6de6d7587c3', 'content': 'For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe accept bulk orders for events and corporate gifting. Please reach out to us at bulk@sweetcrumbs.in for customized packaging and discounted pricing for orders above 50 boxes.# Loyalty Program ΓÇô SweetPointsEarn 1 SweetPoint for every Γé╣10 spent. SweetPoints can be redeemed for discounts on future orders. 100 SweetPoints = Γé╣50 discount. Points are valid for 12 months from the date of earning.# Customer SupportOur support team is available Monday to Saturday, 10 AM to 7 PM IST. You can reach us via email at support@sweetcrumbs.in or via WhatsApp at +91-9876543210.', 'similarity': 0.769463741965216}]
+  - Score: 0.7695 | Chunk: For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe ac...
+  - Score: 0.7695 | Chunk: For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe ac...
+  - Score: 0.7695 | Chunk: For best taste, we recommend consuming them within 7 days of delivery.# Bulk & Corporate OrdersWe ac...
+PASS: Found relevant content above threshold 0.5
+
+[3/3] Running Invalid Query Suite (Expected: Low Similarity)...
+
+QUERY: 'How to test Telegram chatbot integration?'
+DEBUG: Searching KB for: How to test Telegram chatbot integration? (Limit: 1)
+VECTOR SEARCH RESULTS (0 matches): []
+PASS: No results returned.
+
+QUERY: 'How to deploy a webhook?'
+DEBUG: Searching KB for: How to deploy a webhook? (Limit: 1)
+VECTOR SEARCH RESULTS (0 matches): []
+PASS: No results returned.
+
+QUERY: 'Explain vector embeddings'
+DEBUG: Searching KB for: Explain vector embeddings (Limit: 1)
+VECTOR SEARCH RESULTS (0 matches): []
+PASS: No results returned.
+
+QUERY: 'How to build a chatbot?'
+DEBUG: Searching KB for: How to build a chatbot? (Limit: 1)
+VECTOR SEARCH RESULTS (0 matches): []
+PASS: No results returned.
+
+Cleaning up...
+DEBUG: Deleting org_302945a7-2a4b-4b78-a764-daa12777fbaf/530ce16f-8ec2-4f2b-9b2e-cbec53905372_SweetCrumbs_Policy.txt from storage...
+Done.
+==================================================
+TEST COMPLETE
+==================================================

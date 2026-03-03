@@ -8,24 +8,54 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
+test_debug.log
+test_output.log
+unique_results.log
+final_test.log
+final_test_v2.log
 
-node_modules
-dist
-dist-ssr
-*.local
+# Temporary and Test Files
+tmp_test_*
+test_*.py
+debug_storage_fix.py
+diag_embed.py
+inspect_func.py
+test_kb.py
+test_raw_sim.py
+test_sweetcrumbs_kb.py
+test_unique.py
+
+# Dependency directories
+node_modules/
+venv/
+ENV/
+env/
+.venv/
+
+# Python cache and byte-code
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.python-version
+.mypy_cache/
+.ruff_cache/
+
+# Build and dist
+dist/
+dist-ssr/
+build/
 
 # Environment Variables
 .env
 .env.local
-.env.development.local
-.env.test.local
-.env.production.local
 .env.*.local
 
-# Editor directories and files
-.vscode/*
+# IDEs and Editors
+.vscode/
 !.vscode/extensions.json
-.idea
+.idea/
 .DS_Store
 *.suo
 *.ntvs*

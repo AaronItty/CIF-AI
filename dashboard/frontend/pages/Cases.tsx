@@ -45,9 +45,7 @@ const Cases = () => {
   const [search, setSearch] = useState("");
 
   // Use sample cases when no real data is available yet
-  const effectiveConversations = (!loading && conversations.length === 0)
-    ? SAMPLE_CASES
-    : conversations;
+  const effectiveConversations = conversations;
 
   const filtered = useMemo(() => {
     return effectiveConversations.filter((c) => {
