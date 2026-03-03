@@ -72,7 +72,12 @@ env/
 *.pyc
 token.json
 credentials.json
+secrets/credentials.json
+secrets/token.json
 
+# Keep secrets dir structure in git but not contents
+!secrets/.gitkeep
+!secrets/README.md
 
 tmp_test_*.txt
 

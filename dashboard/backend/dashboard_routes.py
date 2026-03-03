@@ -163,22 +163,35 @@ async def connect_channel(req: ChannelConnectRequest):
     # Channel-specific validation
     if req.type == "gmail":
         # Check if credentials.json exists (OAuth app configured)
-        creds_path = req.config.get("credentials_path", "credentials.json") if req.config else "credentials.json"
-        token_path = req.config.get("token_path", "token.json") if req.config else "token.json"
+        from pathlib import Path
+        _proj_root = Path(__file__).resolve().parent.parent.parent
+        creds_path = req.config.get("credentials_path", os.getenv("GMAIL_CREDENTIALS_PATH", "secrets/credentials.json")) if req.config else os.getenv("GMAIL_CREDENTIALS_PATH", "secrets/credentials.json")
+        token_path = req.config.get("token_path", os.getenv("GMAIL_TOKEN_PATH", "secrets/token.json")) if req.config else os.getenv("GMAIL_TOKEN_PATH", "secrets/token.json")
+
+        # Resolve to absolute paths relative to project root
+        if not Path(creds_path).is_absolute():
+            creds_path = str(_proj_root / creds_path)
+        if not Path(token_path).is_absolute():
+            token_path = str(_proj_root / token_path)
 
         if not os.path.exists(creds_path):
             raise HTTPException(
                 status_code=400,
-                detail=f"Gmail OAuth credentials file '{creds_path}' not found. Please download it from Google Cloud Console first."
+                detail=f"Gmail OAuth credentials file not found at '{creds_path}'. Download it from Google Cloud Console and place it in the 'secrets/' directory."
             )
 
-        # If token.json doesn't exist, we need to trigger OAuth flow
+        # If token.json doesn't exist, we need to trigger OAuth flow (one-time)
         if not os.path.exists(token_path):
             try:
                 from google_auth_oauthlib.flow import InstalledAppFlow
                 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
                 flow = InstalledAppFlow.from_client_secrets_file(creds_path, SCOPES)
-                creds = flow.run_local_server(port=0)
+                creds = flow.run_local_server(
+                    port=0,
+                    access_type='offline',
+                    prompt='consent',
+                )
+                os.makedirs(os.path.dirname(token_path), exist_ok=True)
                 with open(token_path, 'w') as token:
                     token.write(creds.to_json())
             except Exception as e:
@@ -212,10 +225,36 @@ async def connect_channel(req: ChannelConnectRequest):
 async def disconnect_channel(channel_id: str):
     """
     Disconnect a channel: set status to inactive or delete the row.
+    If it's Gmail, also delete the token.json file so the background
+    service stops polling and a new OAuth flow is required on next connect.
     """
-    res = _db_client.table("channels").update({"status": "inactive"}).eq("id", channel_id).execute()
-    if not res.data:
+    import os
+    from pathlib import Path
+    
+    # Check what type of channel we are disconnecting
+    channel_query = _db_client.table("channels").select("type").eq("id", channel_id).execute()
+    if not channel_query.data:
         raise HTTPException(status_code=404, detail="Channel not found")
+        
+    channel_type = channel_query.data[0].get("type")
+
+    # Set status to inactive in DB
+    res = _db_client.table("channels").update({"status": "inactive"}).eq("id", channel_id).execute()
+    
+    # If it's gmail, delete the associated token file
+    if channel_type == "gmail":
+        _proj_root = Path(__file__).resolve().parent.parent.parent
+        token_path = os.getenv("GMAIL_TOKEN_PATH", "secrets/token.json")
+        if not Path(token_path).is_absolute():
+            token_path = str(_proj_root / token_path)
+            
+        if os.path.exists(token_path):
+            try:
+                os.remove(token_path)
+                print(f"Deleted Gmail token file at {token_path}")
+            except Exception as e:
+                print(f"Failed to delete Gmail token file: {e}")
+
     return {"status": "disconnected"}
 
 # --- KB Route Implementations ---
