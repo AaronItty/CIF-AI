@@ -1,6 +1,7 @@
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, AlertTriangle, Cpu, FileText, Target } from "lucide-react";
-import { caseDetail } from "@/data/mockData";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, CheckCircle2, AlertTriangle, Cpu, FileText, Target, Loader2 } from "lucide-react";
+import { useCaseDetail } from "@/hooks/useSupabase";
+import { format } from "date-fns";
 
 const statusClass: Record<string, string> = {
   Resolved: "status-resolved",
@@ -17,8 +18,41 @@ const stepIcons: Record<string, typeof Target> = {
 };
 
 const CaseDetail = () => {
+  const { id } = useParams();
   const navigate = useNavigate();
-  const c = caseDetail;
+  const { conversation: c, loading } = useCaseDetail(id);
+
+  if (loading) {
+    return (
+      <div className="flex h-[60vh] items-center justify-center">
+        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  if (!c) {
+    return (
+      <div className="rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+        <AlertTriangle className="mx-auto h-8 w-8 text-destructive mb-2" />
+        <h3 className="text-lg font-semibold text-foreground">Case Not Found</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          The case ID could not be found or you don't have access.
+        </p>
+        <button
+          onClick={() => navigate("/cases")}
+          className="mt-4 text-sm font-medium text-primary hover:underline"
+        >
+          Return to Cases
+        </button>
+      </div>
+    );
+  }
+
+  // Fallback for execution log if not present in metadata
+  const executionLog = (c.metadata as any)?.execution_log || [
+    { step: "Intent Classified", detail: "Customer query categorized successfully", confidence: c.ai_confidence_score || 0.95 },
+    { step: "Case Logged", detail: "Interaction saved to database", timestamp: c.created_at }
+  ];
 
   return (
     <div className="space-y-6">
@@ -36,7 +70,9 @@ const CaseDetail = () => {
               {c.status}
             </span>
           </div>
-          <p className="text-sm text-muted-foreground">{c.customer} · {c.intent} · Confidence {c.confidence}%</p>
+          <p className="text-sm text-muted-foreground">
+            {c.users?.full_name ?? "Anonymous Customer"} · {c.channels?.display_name ?? c.channels?.type ?? "Web Chat"} · Confidence {(c.ai_confidence_score || 0) * 100}%
+          </p>
         </div>
       </div>
 
@@ -45,25 +81,30 @@ const CaseDetail = () => {
         <div className="lg:col-span-3 rounded-xl border bg-card p-5">
           <h3 className="text-sm font-semibold text-foreground mb-4">Conversation Timeline</h3>
           <div className="space-y-4">
-            {c.conversation.map((msg, i) => (
-              <div
-                key={i}
-                className={`flex ${msg.role === "customer" ? "justify-start" : "justify-end"}`}
-              >
+            {c.messages && c.messages.length > 0 ? (
+              c.messages.map((msg, i) => (
                 <div
-                  className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm ${
-                    msg.role === "customer"
-                      ? "bg-secondary text-foreground rounded-bl-sm"
-                      : "bg-primary text-primary-foreground rounded-br-sm"
-                  }`}
+                  key={msg.id || i}
+                  className={`flex ${msg.role === "customer" ? "justify-start" : "justify-end"}`}
                 >
-                  <p>{msg.message}</p>
-                  <p className={`mt-1 text-[10px] ${msg.role === "customer" ? "text-muted-foreground" : "text-primary-foreground/70"}`}>
-                    {msg.timestamp}
-                  </p>
+                  <div
+                    className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm ${msg.role === "customer"
+                        ? "bg-secondary text-foreground rounded-bl-sm"
+                        : "bg-primary text-primary-foreground rounded-br-sm"
+                      }`}
+                  >
+                    <p>{msg.content}</p>
+                    <p className={`mt-1 text-[10px] ${msg.role === "customer" ? "text-muted-foreground" : "text-primary-foreground/70"}`}>
+                      {format(new Date(msg.created_at), "MMM d, h:mm a")}
+                    </p>
+                  </div>
                 </div>
+              ))
+            ) : (
+              <div className="py-12 text-center text-sm text-muted-foreground italic">
+                No messages found for this case.
               </div>
-            ))}
+            )}
           </div>
         </div>
 
@@ -72,7 +113,7 @@ const CaseDetail = () => {
           <div className="rounded-xl border bg-card p-5">
             <h3 className="text-sm font-semibold text-foreground mb-4">Execution Log</h3>
             <div className="space-y-3">
-              {c.executionLog.map((step, i) => {
+              {executionLog.map((step: any, i: number) => {
                 const Icon = stepIcons[step.step] || Cpu;
                 return (
                   <div key={i} className="flex gap-3">
@@ -80,7 +121,7 @@ const CaseDetail = () => {
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-accent">
                         <Icon size={14} className="text-accent-foreground" />
                       </div>
-                      {i < c.executionLog.length - 1 && <div className="w-px flex-1 bg-border mt-1" />}
+                      {i < executionLog.length - 1 && <div className="w-px flex-1 bg-border mt-1" />}
                     </div>
                     <div className="pb-3">
                       <p className="text-xs font-semibold text-foreground">{step.step}</p>
@@ -105,11 +146,11 @@ const CaseDetail = () => {
             <h3 className="text-sm font-semibold text-foreground mb-3">Case Metadata</h3>
             <dl className="space-y-2 text-sm">
               {[
-                ["Customer ID", c.customerId],
-                ["Intent", c.intent],
-                ["Escalated", c.escalated ? "Yes" : "No"],
-                ["Created", new Date(c.createdAt).toLocaleString()],
-                ["Resolved", new Date(c.updatedAt).toLocaleString()],
+                ["Customer", c.users?.full_name ?? c.users?.email ?? "Anonymous"],
+                ["Channel", c.channels?.display_name ?? c.channels?.type ?? "Web"],
+                ["Escalated", c.status === "escalated" ? "Yes" : "No"],
+                ["Created", format(new Date(c.created_at), "MMM d, h:mm a")],
+                ["Last Activity", format(new Date(c.updated_at), "MMM d, h:mm a")],
               ].map(([k, v]) => (
                 <div key={k} className="flex justify-between">
                   <dt className="text-muted-foreground">{k}</dt>

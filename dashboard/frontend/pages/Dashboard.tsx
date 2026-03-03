@@ -59,7 +59,7 @@ const Dashboard = () => {
     }
   }, [orgId, orgLoaded]);
 
-  const effectiveStats = (stats && stats.totalConversations > 0) ? stats : (!loading ? SAMPLE_STATS : null);
+  const effectiveStats = stats;
 
   const kpiCards = effectiveStats
     ? [

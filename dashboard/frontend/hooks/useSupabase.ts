@@ -19,6 +19,15 @@ export interface Conversation {
     message_count: number;
     users?: { full_name: string | null; email: string | null };
     channels?: { type: string; display_name: string | null };
+    messages?: Message[];
+    metadata: any;
+}
+
+export interface Message {
+    id: string;
+    role: "customer" | "assistant" | "system";
+    content: string;
+    created_at: string;
 }
 
 export interface ChannelRow {
@@ -332,4 +341,48 @@ export function useReminders(orgId: string | null, orgLoaded = false) {
     };
 
     return { reminders, loading, markAsRead, markAllAsRead, clearAll };
+}
+
+// ─── useCaseDetail ───────────────────────────────────────────────────────────
+
+export function useCaseDetail(caseId: string | undefined) {
+    const [conversation, setConversation] = useState<Conversation | null>(null);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => {
+        if (!caseId) {
+            setLoading(false);
+            return;
+        }
+
+        const fetchDetail = async () => {
+            setLoading(true);
+            try {
+                const { data, error } = await supabase
+                    .from("conversations")
+                    .select("*, users(full_name, email), channels(type, display_name), messages(*)")
+                    .eq("id", caseId)
+                    .single();
+
+                if (error) {
+                    console.error("Error fetching case detail:", error);
+                    setConversation(null);
+                } else {
+                    // Sort messages by creation date
+                    if (data.messages) {
+                        data.messages.sort((a: Message, b: Message) =>
+                            new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+                        );
+                    }
+                    setConversation(data as Conversation);
+                }
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchDetail();
+    }, [caseId]);
+
+    return { conversation, loading };
 }
