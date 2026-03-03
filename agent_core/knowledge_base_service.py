@@ -11,6 +11,20 @@ class KnowledgeBaseService:
     def __init__(self, db_client: SupabaseClient, embedding_service: EmbeddingService):
         self.db = db_client.get_client()
         self.embeddings = embedding_service
+        self.bucket_name = "knowledge-base"
+
+    def ensure_bucket_exists(self):
+        """Checks if the storage bucket exists, and creates it if it doesn't."""
+        try:
+            buckets = self.db.storage.list_buckets()
+            bucket_names = [b.name for b in buckets] if buckets else []
+            if self.bucket_name not in bucket_names:
+                print(f"DEBUG: Creating missing storage bucket: {self.bucket_name}")
+                self.db.storage.create_bucket(self.bucket_name, options={"public": False})
+        except Exception as e:
+            print(f"DEBUG BUCKET ERROR: {str(e)}")
+            # If we fail to list/create, we'll hit errors during upload anyway, 
+            # but we try to be proactive.
 
     def chunk_text(self, text: str, chunk_size: int = 150, overlap: int = 30) -> List[str]:
         """
@@ -24,6 +38,27 @@ class KnowledgeBaseService:
             if i + chunk_size >= len(words):
                 break
         return chunks
+
+    def chunk_text_by_section(self, text: str) -> List[str]:
+        """
+        Splits text by numbered sections (e.g., '1. About', '2. Shipping').
+        This ensures semantic boundaries are preserved.
+        """
+        # Matches start of string or newline followed by heading
+        # We use a lookahead to keep the heading in the chunk
+        pattern = r'(?=(?:^|\n)(?:#+\s+|\d+\.\s+))'
+        sections = re.split(pattern, text)
+        
+        # Clean up sections and remove empty ones
+        cleaned_sections = [s.strip() for s in sections if s.strip()]
+        
+        # If no sections found, fallback to standard chunking
+        if len(cleaned_sections) <= 1:
+            print("DEBUG: No numbered sections found, falling back to window chunking.")
+            return self.chunk_text(text)
+            
+        print(f"DEBUG: Found {len(cleaned_sections)} semantic sections.")
+        return cleaned_sections
 
     def clean_text(self, text: str) -> str:
         """
@@ -57,16 +92,22 @@ class KnowledgeBaseService:
         Full ingestion pipeline: Upload to Storage -> Save doc -> Extract -> Chunk -> Embed -> Store Chunks.
         """
         # 1. Upload file to Supabase Storage
+        self.ensure_bucket_exists()
         file_path = f"org_{organization_id}/{uuid.uuid4()}_{name}"
         try:
-            print(f"DEBUG: Uploading {name} to storage...")
-            self.db.storage.from_("knowledge-base").upload(
+            print(f"DEBUG: Uploading {name} to storage at {file_path}...")
+            upload_res = self.db.storage.from_(self.bucket_name).upload(
                 path=file_path,
                 file=file_bytes,
                 file_options={"content-type": "application/pdf" if name.lower().endswith(".pdf") else "text/plain"}
             )
+            # Verify upload success
+            if hasattr(upload_res, 'error') and upload_res.error:
+                raise Exception(f"Storage Upload Error: {upload_res.error}")
+                
         except Exception as e:
             print(f"DEBUG STORAGE ERROR: {str(e)}")
+            raise Exception(f"Failed to store physical file in KB: {str(e)}")
 
         file_size = len(file_bytes)
         mime_type = "application/pdf" if name.lower().endswith(".pdf") else "text/plain"
@@ -104,8 +145,8 @@ class KnowledgeBaseService:
             # 4. Clean and Chunk
             # PostgreSQL does not support null characters or certain control chars in text fields
             content = self.clean_text(content)
-            chunks = self.chunk_text(content)
-            print(f"DEBUG: Chunked into {len(chunks)} parts")
+            chunks = self.chunk_text_by_section(content)
+            print(f"DEBUG: Created {len(chunks)} semantic chunks")
             
             for i, chunk in enumerate(chunks):
                 print(f"DEBUG: Embedding chunk {i}...")
@@ -163,30 +204,36 @@ class KnowledgeBaseService:
             "last_updated": last_updated
         }
 
-    async def search_knowledge_base(self, organization_id: str, query: str, limit: int = 5):
+    async def search_knowledge_base(self, organization_id: str, query: str, limit: int = 2):
         """Performs vector search to retrieve relevant chunks."""
-        print(f"DEBUG: Searching KB for: {query}")
+        print(f"DEBUG: Searching KB for: {query} (Limit: {limit})")
         # nomic-embed-text-v1.5 requires 'search_query: ' prefix for queries
         query_embedding = self.embeddings.embed_query(query)
         
         # Use the RPC 'match_documents' we defined in SQL
+        # match_threshold set to 0.65 as per optimization request
+        MIN_SCORE = 0.65
         res = self.db.rpc("match_documents", {
             "query_embedding": query_embedding,
-            "match_threshold": 0.0, # Temporarily 0.0 for testing
-            "match_count": limit
+            "match_threshold": MIN_SCORE, 
+            "match_count": limit,
+            "p_organization_id": organization_id # Pass the org filter
         }).execute()
         
-        print("VECTOR SEARCH RESULTS:", res.data)
+        # Filter again just in case the RPC threshold isn't precise or for safety
+        filtered_results = [r for r in (res.data or []) if r.get("similarity", 0) >= MIN_SCORE]
         
-        if not res.data:
+        print(f"VECTOR SEARCH RESULTS ({len(filtered_results)} matches):", filtered_results)
+        
+        if not filtered_results:
             return {
-                "message": "No relevant knowledge found.",
+                "message": "No Direct Policy Found",
                 "results": []
             }
             
         return {
-            "message": f"Found {len(res.data)} matching results.",
-            "results": res.data
+            "message": f"Found {len(filtered_results)} relevant knowledge fragments.",
+            "results": filtered_results
         }
 
     def delete_document(self, document_id: str):
@@ -202,7 +249,7 @@ class KnowledgeBaseService:
                     # 2. Delete from Storage
                     print(f"DEBUG: Deleting {storage_path} from storage...")
                     # .remove() expects a list of paths
-                    self.db.storage.from_("knowledge-base").remove([storage_path])
+                    self.db.storage.from_(self.bucket_name).remove([storage_path])
                 except Exception as e:
                     print(f"DEBUG STORAGE DELETE ERROR: {str(e)}")
 

@@ -86,26 +86,33 @@ async def view_file(file_id: str):
         raise HTTPException(status_code=400, detail="Document has no storage path")
 
     try:
-        signed = _kb_service.db.storage.from_("knowledge-base").create_signed_url(
+        # Generate a signed URL for 1 hour
+        signed = _kb_service.db.storage.from_(_kb_service.bucket_name).create_signed_url(
             path=doc["storage_path"],
-            expires_in=60
+            expires_in=3600
         )
         print("SIGNED DEBUG:", signed)
 
-        # Handle different response structures
         url = None
+        # Handle cases where `signed` is a dict with 'signedURL' or 'signedUrl'
         if isinstance(signed, dict):
             url = signed.get("signedURL") or signed.get("signedUrl")
+        # Handle cases where `signed` is a string (older clients or direct result)
         elif isinstance(signed, str):
             url = signed
+        # Handle cases where the result has a .signed_url attribute (newer python clients)
+        elif hasattr(signed, 'signed_url'):
+             url = signed.signed_url
+        elif hasattr(signed, 'signedURL'):
+             url = signed.signedURL
 
         if not url:
-            raise Exception(f"Could not extract signed URL from response: {signed}")
+            raise Exception(f"Could not extract signed URL from response type {type(signed)}: {signed}")
 
         return {"url": url}
     except Exception as e:
         print(f"SIGNED URL ERROR: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Storage error: {str(e)}")
 
 @router.delete("/files/{file_id}")
 async def delete_file(file_id: str):
