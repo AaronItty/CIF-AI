@@ -4,7 +4,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Bot } from "lucide-react";
-import { supabase } from "@/lib/supabase";
+import { supabase } from "@/context/AuthContext";
 
 
 const Login = () => {

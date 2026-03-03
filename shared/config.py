@@ -8,7 +8,7 @@ class Config:
 
     # Supabase Configuration
     SUPABASE_URL = os.getenv("OUR_SUPABASE_URL", "")
-    SUPABASE_KEY = os.getenv("OUR_SUPABASE_ANON_KEY", "")
+    SUPABASE_KEY = os.getenv("OUR_SUPABASE_KEY", "")
     DEFAULT_ORG_ID = os.getenv("DEFAULT_ORG_ID", "302945a7-2a4b-4b78-a764-daa12777fbaf")
     
     # MCP Server Configuration

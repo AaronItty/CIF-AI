@@ -1,9 +1,15 @@
+"""
+Canonical location for the Supabase database client.
+All server-side code should import SupabaseClient from here.
+"""
+
 from supabase import create_client, Client
 from shared.config import Config
 
 class SupabaseClient:
     """
     Singleton-style wrapper for Supabase database access.
+    Uses the service role key for full server-side access.
     """
     _instance = None
     
@@ -23,4 +29,3 @@ class SupabaseClient:
         Return the configured Supabase client instance.
         """
         return self.client
-

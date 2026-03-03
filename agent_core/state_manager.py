@@ -4,7 +4,7 @@ Handles session memory abstraction over the Supabase backend.
 """
 
 from typing import Dict, Any, List
-from dashboard.backend.conversation_repository import ConversationRepository
+from shared.data_access.conversation_repository import ConversationRepository
 
 class StateManager:
     """
