@@ -59,6 +59,7 @@ const CaseDetail = () => {
       <div className="flex items-center gap-3">
         <button
           onClick={() => navigate("/cases")}
+          title="Back to Cases"
           className="flex h-8 w-8 items-center justify-center rounded-lg border bg-card transition-colors hover:bg-secondary"
         >
           <ArrowLeft size={16} />
@@ -71,7 +72,7 @@ const CaseDetail = () => {
             </span>
           </div>
           <p className="text-sm text-muted-foreground">
-            {c.users?.full_name ?? "Anonymous Customer"} · {c.channels?.display_name ?? c.channels?.type ?? "Web Chat"} · Confidence {(c.ai_confidence_score || 0) * 100}%
+            {c.users?.full_name ?? "Anonymous Customer"} · {c.channels?.display_name ?? c.channels?.type ?? "Web Chat"} · Confidence {c.ai_confidence_score != null ? `${(c.ai_confidence_score * 100).toFixed(0)}%` : "N/A"}
           </p>
         </div>
       </div>
@@ -89,8 +90,8 @@ const CaseDetail = () => {
                 >
                   <div
                     className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm ${msg.role === "customer"
-                        ? "bg-secondary text-foreground rounded-bl-sm"
-                        : "bg-primary text-primary-foreground rounded-br-sm"
+                      ? "bg-secondary text-foreground rounded-bl-sm"
+                      : "bg-primary text-primary-foreground rounded-br-sm"
                       }`}
                   >
                     <p>{msg.content}</p>

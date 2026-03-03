@@ -358,9 +358,11 @@ export function useCaseDetail(caseId: string | undefined) {
         const fetchDetail = async () => {
             setLoading(true);
             try {
+                // Fetch conversation with messages. 
+                // Note: database uses 'session_id' as the FK for messages.
                 const { data, error } = await supabase
                     .from("conversations")
-                    .select("*, users(full_name, email), channels(type, display_name), messages(*)")
+                    .select("*, users(full_name, email), channels(type, display_name), messages!session_id(*)")
                     .eq("id", caseId)
                     .single();
 
