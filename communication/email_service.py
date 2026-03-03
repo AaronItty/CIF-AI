@@ -29,16 +29,17 @@ class EmailServiceHandler(EmailHandler):
         """
         Modified listener that POSTs to the Agent Core Service instead of calling a Python method.
         """
-        if not self.service:
-            self.service = self._authenticate()
-            
-        if not self.service:
-            print("Gmail API authentication failed. Listener stopping.")
-            return
-
         print(f"Started Gmail API Microservice listener (Target: {self.agent_url})...")
         try:
             while True:
+                if not self.service:
+                    self.service = self._authenticate()
+                    
+                if not self.service:
+                    print("[Gmail API] Not authenticated. Waiting for token.json (connect via Dashboard)...")
+                    await asyncio.sleep(10)
+                    continue
+
                 print("Polling Gmail for unread messages...")
                 loop = asyncio.get_event_loop()
                 results = await loop.run_in_executor(

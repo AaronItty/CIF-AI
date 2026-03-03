@@ -1,14 +1,23 @@
 """
 Email integration handler via Gmail API.
 Stateless handler that normalizes input and passes it to Agent Core.
+
+Security notes:
+  - credentials.json and token.json are gitignored and must NEVER be committed.
+  - Paths are resolved from environment variables (GMAIL_CREDENTIALS_PATH, GMAIL_TOKEN_PATH)
+    and converted to absolute paths relative to the project root.
+  - OAuth uses access_type='offline' to obtain a long-lived refresh token,
+    so re-authentication is only needed if the token file is deleted or scopes change.
 """
 
 import os
 import base64
 import asyncio
+from pathlib import Path
 from email.message import EmailMessage
 from typing import Dict, Any
 
+from dotenv import load_dotenv
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
@@ -17,6 +26,11 @@ from googleapiclient.errors import HttpError
 
 from shared.interfaces import BaseChannelHandler, AgentInterface
 from communication.schemas.normalized_message import NormalizedMessage
+
+load_dotenv()
+
+# Project root = parent of the 'communication' package directory
+_PROJECT_ROOT = Path(__file__).resolve().parent.parent
 
 # If modifying these scopes, delete the file token.json.
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
@@ -29,52 +43,88 @@ class EmailHandler(BaseChannelHandler):
     def __init__(self, agent: AgentInterface, gmail_settings: Dict[str, Any] = None):
         self.agent = agent
         self.gmail_settings = gmail_settings or {}
-        self.credentials_path = self.gmail_settings.get('credentials_path', 'credentials.json')
-        self.token_path = self.gmail_settings.get('token_path', 'token.json')
+
+        # Resolve credential paths: settings dict > env var > default
+        raw_creds = self.gmail_settings.get(
+            'credentials_path',
+            os.getenv('GMAIL_CREDENTIALS_PATH', 'secrets/credentials.json')
+        )
+        raw_token = self.gmail_settings.get(
+            'token_path',
+            os.getenv('GMAIL_TOKEN_PATH', 'secrets/token.json')
+        )
+
+        # Make paths absolute (relative to project root)
+        self.credentials_path = str(
+            Path(raw_creds) if Path(raw_creds).is_absolute() else _PROJECT_ROOT / raw_creds
+        )
+        self.token_path = str(
+            Path(raw_token) if Path(raw_token).is_absolute() else _PROJECT_ROOT / raw_token
+        )
+
         self.service = None
         
     def _authenticate(self):
-        """Authenticate and return the Gmail API service."""
+        """
+        Authenticate and return the Gmail API service.
+
+        Flow:
+          1. Try loading an existing token from token_path.
+          2. If the token is expired but has a refresh_token, silently refresh it.
+          3. Only if no usable token exists, start the interactive OAuth flow
+             (one-time operation — the resulting refresh token is saved).
+        """
         creds = None
+
+        # --- Step 1: Try to load a saved token ---
         if os.path.exists(self.token_path):
-            creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
-            
-        # If there are no (valid) credentials available, let the user log in.
+            try:
+                creds = Credentials.from_authorized_user_file(self.token_path, SCOPES)
+                print(f"[Gmail Auth] Loaded existing token from {self.token_path}")
+            except Exception as e:
+                print(f"[Gmail Auth] Failed to load token file: {e}")
+                creds = None
+
+        # --- Step 2: Refresh or re-authenticate ---
         if not creds or not creds.valid:
             if creds and creds.expired and creds.refresh_token:
-                creds.refresh(Request())
-            elif os.path.exists(self.credentials_path):
-                flow = InstalledAppFlow.from_client_secrets_file(
-                    self.credentials_path, SCOPES)
-                creds = flow.run_local_server(port=0)
-            else:
-                print(f"Warning: neither {self.token_path} nor {self.credentials_path} found. Gmail API skipping auth.")
+                try:
+                    creds.refresh(Request())
+                    print("[Gmail Auth] Token refreshed successfully (no user interaction needed).")
+                except Exception as e:
+                    print(f"[Gmail Auth] Token refresh failed: {e}. Will need re-authentication.")
+                    creds = None
+
+            if not creds or not creds.valid:
+                print(f"[Gmail Auth] No valid token found. Please connect the Gmail channel via the Dashboard UI.")
                 return None
-                
-            # Save the credentials for the next run
-            with open(self.token_path, 'w') as token:
-                token.write(creds.to_json())
+
+            # --- Save token for future runs (if it was refreshed) ---
+            os.makedirs(os.path.dirname(self.token_path), exist_ok=True)
+            with open(self.token_path, 'w') as token_file:
+                token_file.write(creds.to_json())
 
         try:
             return build('gmail', 'v1', credentials=creds)
         except Exception as e:
-            print(f"Failed to build Gmail service: {e}")
+            print(f"[Gmail Auth] Failed to build Gmail service: {e}")
             return None
             
     async def listen(self):
         """
         Start Gmail API listener (polling method).
         """
-        if not self.service:
-            self.service = self._authenticate()
-            
-        if not self.service:
-            print("Gmail API authentication failed. Listener stopping.")
-            return
-
         print("Started Gmail API listener...")
         try:
             while True:
+                if not self.service:
+                    self.service = self._authenticate()
+                    
+                if not self.service:
+                    print("[Gmail API] Not connected. Waiting for OAuth via Dashboard... (retrying in 10s)")
+                    await asyncio.sleep(10)
+                    continue
+
                 # Poll for unread messages using run_in_executor to not block event loop
                 loop = asyncio.get_event_loop()
                 results = await loop.run_in_executor(
