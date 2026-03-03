@@ -25,7 +25,7 @@ export interface Conversation {
 
 export interface Message {
     id: string;
-    role: "customer" | "assistant" | "system";
+    role: "user" | "customer" | "assistant" | "system";
     content: string;
     created_at: string;
 }

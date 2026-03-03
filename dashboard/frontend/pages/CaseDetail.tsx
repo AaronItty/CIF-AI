@@ -1,5 +1,5 @@
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, CheckCircle2, AlertTriangle, Cpu, FileText, Target, Loader2 } from "lucide-react";
+import { ArrowLeft, CheckCircle2, AlertTriangle, Cpu, FileText, Target, Loader2, Mail, MessageSquare, Globe } from "lucide-react";
 import { useCaseDetail } from "@/hooks/useSupabase";
 import { format } from "date-fns";
 
@@ -15,6 +15,13 @@ const stepIcons: Record<string, typeof Target> = {
   "Skill Executed": Cpu,
   "Policy Retrieved": FileText,
   "Case Resolved": CheckCircle2,
+};
+
+const channelIcons: Record<string, typeof Mail> = {
+  email: Mail,
+  gmail: Mail,
+  web: Globe,
+  telegram: MessageSquare,
 };
 
 const CaseDetail = () => {
@@ -86,16 +93,16 @@ const CaseDetail = () => {
               c.messages.map((msg, i) => (
                 <div
                   key={msg.id || i}
-                  className={`flex ${msg.role === "customer" ? "justify-start" : "justify-end"}`}
+                  className={`flex ${msg.role === "user" ? "justify-start" : "justify-end"}`}
                 >
                   <div
-                    className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm ${msg.role === "customer"
+                    className={`max-w-[80%] rounded-xl px-4 py-2.5 text-sm ${msg.role === "user"
                       ? "bg-secondary text-foreground rounded-bl-sm"
                       : "bg-primary text-primary-foreground rounded-br-sm"
                       }`}
                   >
                     <p>{msg.content}</p>
-                    <p className={`mt-1 text-[10px] ${msg.role === "customer" ? "text-muted-foreground" : "text-primary-foreground/70"}`}>
+                    <p className={`mt-1 text-[10px] ${msg.role === "user" ? "text-muted-foreground" : "text-primary-foreground/70"}`}>
                       {format(new Date(msg.created_at), "MMM d, h:mm a")}
                     </p>
                   </div>
@@ -148,12 +155,20 @@ const CaseDetail = () => {
             <dl className="space-y-2 text-sm">
               {[
                 ["Customer", c.users?.full_name ?? c.users?.email ?? "Anonymous"],
-                ["Channel", c.channels?.display_name ?? c.channels?.type ?? "Web"],
+                ["Channel", (
+                  <span className="flex items-center gap-2">
+                    {(() => {
+                      const Icon = channelIcons[c.channels?.type?.toLowerCase() || "web"] || Globe;
+                      return <Icon size={14} className="text-muted-foreground" />;
+                    })()}
+                    <span className="capitalize">{c.channels?.display_name || c.channels?.type || "Web"}</span>
+                  </span>
+                )],
                 ["Escalated", c.status === "escalated" ? "Yes" : "No"],
                 ["Created", format(new Date(c.created_at), "MMM d, h:mm a")],
                 ["Last Activity", format(new Date(c.updated_at), "MMM d, h:mm a")],
               ].map(([k, v]) => (
-                <div key={k} className="flex justify-between">
+                <div key={k as string} className="flex justify-between items-center">
                   <dt className="text-muted-foreground">{k}</dt>
                   <dd className="font-medium text-foreground">{v}</dd>
                 </div>
