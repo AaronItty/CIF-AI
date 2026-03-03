@@ -14,7 +14,7 @@ class SupabaseClient:
             cls._instance.key = Config.SUPABASE_KEY
             if not cls._instance.url or not cls._instance.key:
                 # Fallback for dev if env is not loaded correctly
-                pass
+                print("SUPABASE_URL or SUPABASE_KEY not found in .env file")
             cls._instance.client: Client = create_client(cls._instance.url, cls._instance.key)
         return cls._instance
         
