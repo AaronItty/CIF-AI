@@ -17,6 +17,7 @@ AGENT_CORE_URL = os.getenv("AGENT_CORE_URL", "http://localhost:8002/api/v1/proce
 class SendEmailRequest(BaseModel):
     recipient_id: str
     message: str
+    subject: str = "Agent Response"
 
 # Use the existing EmailHandler but patch its agent interaction
 class EmailServiceHandler(EmailHandler):
@@ -129,7 +130,7 @@ async def send_email(req: SendEmailRequest):
     """
     Endpoint for Layer 2 or others to trigger an outgoing email.
     """
-    success = await email_handler_svc.send_message(req.recipient_id, req.message)
+    success = await email_handler_svc.send_message(req.recipient_id, req.message, subject=req.subject)
     if not success:
         raise HTTPException(status_code=500, detail="Failed to send email via Gmail API")
     return {"status": "sent"}

@@ -1,6 +1,8 @@
 """
 Main planning loop.
 Orchestrates the reason -> evaluate -> execute -> update cycle.
+
+Now triggers MCP tool discovery at startup and passes tool info to the ReasoningEngine.
 """
 
 import asyncio
@@ -26,19 +28,33 @@ class PlanningLoop:
         self.reasoning = reasoning
         self.controller = controller
         self.state_manager = state_manager
+        self._tools_discovered = False
+        
+    async def _ensure_tools_discovered(self):
+        """Discover MCP tools once, then cache for subsequent requests."""
+        if not self._tools_discovered:
+            await self.controller.discover_tools()
+            self._tools_discovered = True
         
     async def process_message(self, normalized_msg: NormalizedMessage) -> dict:
         """
         while not resolved:
-            1. Extract intent
-            2. Evaluate via controller
-            3. Decide: respond / call tool / ask clarification / escalate
-            4. Execute action
-            5. Update memory
-            6. Loop
+            1. Discover tools (once)
+            2. Extract intent (with tool descriptions)
+            3. Evaluate via controller
+            4. Decide: respond / call tool / ask clarification / escalate
+            5. Execute action
+            6. Update memory
+            7. Loop
         """
         session_id = normalized_msg.session_id
         message = normalized_msg.message
+        
+        # Ensure tools are discovered from MCP server
+        await self._ensure_tools_discovered()
+        
+        # Get the dynamic tool descriptions for the LLM prompt
+        tool_descriptions = self.controller.get_tool_descriptions_for_prompt()
         
         # Save the new incoming user message to memory immediately
         await self.state_manager.update_session_state(session_id, {
@@ -67,24 +83,27 @@ class PlanningLoop:
             print(f"[DEBUG] PlanningLoop: Loaded {len(memory)} messages from memory for session {session_id}")
             
             # Create a simplified state dict for the Policy Engine evaluation
-            # (e.g., getting user_role from db, checking consecutive failures, etc)
             eval_state = {
-                "user_role": "admin", # Hardcoded for now, would fetch from DB based on user_id
+                "user_role": "admin",  # Hardcoded for now, would fetch from DB based on user_id
                 "latest_user_message": message,
-                "consecutive_tool_failures": 0 # Would compute from memory in a real app
+                "consecutive_tool_failures": 0  # Would compute from memory in a real app
             }
             
-            # Step 2: Extract Intent using Groq
-            intent = await self.reasoning.extract_intent(message, memory)
+            # Step 2: Extract Intent using Groq (with dynamic tool descriptions)
+            intent = await self.reasoning.extract_intent(message, memory, tool_descriptions)
             if loops == 1:
-                 # Save the original intent for the final conversational response
                  original_intent = intent
             
             # Step 3: Evaluate & Decide using strict deterministic Controller
             decision = await self.controller.evaluate(intent, eval_state)
             
             # Step 4: Execute Action (run tool via MCP or format standard response)
-            action_result = await self.controller.execute_action(decision, intent)
+            action_result = await self.controller.execute_action(
+                decision, intent,
+                session_id=session_id,
+                user_id=normalized_msg.user_id,
+                channel=normalized_msg.channel
+            )
             
             # Step 5: Update loop control & memory
             if decision == "call_tool":

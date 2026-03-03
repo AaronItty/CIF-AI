@@ -14,8 +14,8 @@ class PolicyEngine:
         # Example RBAC mapping: {role: [allowed_tools]}
         # In a real app, this might come from Supabase or Auth0
         self.role_permissions = {
-            "customer": ["get_order_status", "faq_search"],
-            "admin": ["get_order_status", "faq_search", "process_refund", "update_database"]
+            "customer": ["search_item", "escalate_to_human", "get_order_status", "faq_search"],
+            "admin": ["search_item", "buy_item", "escalate_to_human", "get_order_status", "faq_search", "update_database"]
         }
         
     def check_tool_permission(self, tool_name: str, role: str) -> bool:
@@ -36,14 +36,11 @@ class PolicyEngine:
         
     def should_escalate(self, state: Dict[str, Any]) -> bool:
         """
-        Evaluate context against escalation triggers (e.g., repeating failed loops, explicit user requests).
+        Evaluate context against escalation triggers.
+        Only triggers on consecutive tool failures (3+).
+        Keyword-based triggers have been removed to avoid false positives.
         """
-        # Example check 1: Explicit user request to talk to human
-        user_message = state.get("latest_user_message", "").lower()
-        if any(trigger in user_message for trigger in ["human", "agent", "support", "escalate", "help"]):
-            return True
-            
-        # Example check 2: Too many repeated tool failures
+        # Check: Too many repeated tool failures
         failures = state.get("consecutive_tool_failures", 0)
         if failures >= 3:
             return True

@@ -21,3 +21,6 @@ class Config:
     # Communication Channels
     TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
     EMAIL_IMAP_SERVER = os.getenv("EMAIL_IMAP_SERVER", "")
+    
+    # Escalation
+    ESCALATION_EMAIL = os.getenv("ESCALATION_EMAIL", "")

@@ -196,7 +196,7 @@ class EmailHandler(BaseChannelHandler):
         except Exception as e:
             print(f"Error in Gmail listener: {e}")
             
-    async def send_message(self, recipient_id: str, message: str) -> bool:
+    async def send_message(self, recipient_id: str, message: str, subject: str = "Agent Response") -> bool:
         """
         Send an email response using the Gmail API.
         """
@@ -211,7 +211,7 @@ class EmailHandler(BaseChannelHandler):
             email_msg.set_content(message)
             email_msg['To'] = recipient_id
             email_msg['From'] = 'me'
-            email_msg['Subject'] = 'Agent Response'
+            email_msg['Subject'] = subject
 
             encoded_message = base64.urlsafe_b64encode(email_msg.as_bytes()).decode()
 

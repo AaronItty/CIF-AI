@@ -1,6 +1,8 @@
 """
 Reasoning engine wrapper.
 Interfaces with the LLM to extract intent and generate responses.
+
+Now accepts dynamic tool descriptions from the Controller for prompt injection.
 """
 
 import json
@@ -18,28 +20,42 @@ class ReasoningEngine:
         self.intent_model = "llama-3.1-8b-instant" 
         self.chat_model = "llama-3.1-8b-instant"
         
-    async def extract_intent(self, text: str, context: List[Dict[str, Any]]) -> dict:
+    async def extract_intent(self, text: str, context: List[Dict[str, Any]], tool_descriptions: str = "") -> dict:
         """
         Extract user intent, entities, and requested actions from text.
         Forces the LLM to output a structured JSON response.
+        
+        tool_descriptions: A formatted string of available MCP tools, dynamically
+                          discovered from the MCP server at runtime.
         """
+        # Build tool instruction based on what's actually available
+        if tool_descriptions and tool_descriptions != "No tools are currently available.":
+            tool_instruction = (
+                f"You have access to the following tools:\n{tool_descriptions}\n\n"
+                "If the user's intent matches a tool, set 'action' to the tool name and extract "
+                "the relevant parameters into 'entities'. If no tool matches, set 'action' to 'none'."
+            )
+        else:
+            tool_instruction = (
+                "No tools are currently available. You must set 'action' to 'none' for all requests."
+            )
+        
         system_prompt = (
             "You are an intent extraction engine. Analyze the user's input and determine what they want to do. "
-            "IMPORTANT: Tools and Actions are currently OFFLINE. You must set 'action' to 'none' for all requests. "
+            f"{tool_instruction} "
             "You must respond in pure JSON format matching this schema: "
-            '{"intent": "description of intent", "action": "none", '
+            '{"intent": "description of intent", "action": "tool_name_or_none", '
             '"entities": {"key": "value"}, "confidence": 0.0-1.0}'
         )
         
         # Build prompt messages including short context (last 10 messages)
-        # We limit to the most recent 10 to stay within the user's requested 'memory' limit.
         messages = [{"role": "system", "content": system_prompt}]
         
         print(f"\n--- [DEBUG] LLM Context Injection ---")
         print(f"Total raw history messages fetched: {len(context)}")
+        print(f"Tools available: {'YES' if tool_descriptions else 'NO'}")
         
-        # Filter context: Keep only past messages (exclude the one we just saved if it's already in there)
-        # We also limit to the most recent 10.
+        # Filter context: Keep only past messages, limit to most recent 10
         past_messages = [m for m in context if m.get("content") != text][-10:]
         print(f"Messages kept as history (excluding current): {len(past_messages)}")
         

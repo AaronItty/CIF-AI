@@ -26,8 +26,8 @@ reasoning_engine = ReasoningEngine(api_key=LLM_API_KEY)
 policy_engine = PolicyEngine()
 controller = Controller(
     policy_engine=policy_engine,
-    mcp_server_url="", # MCP removed for now
-    mcp_shared_secret=""
+    mcp_server_url=os.getenv("MCP_SERVER_URL", "http://localhost:8004"),
+    mcp_shared_secret=os.getenv("MCP_SHARED_SECRET", "super-secret-mcp-key-123")
 )
 planning_loop = PlanningLoop(reasoning_engine, controller, state_manager)
 
