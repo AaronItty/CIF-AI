@@ -8,7 +8,8 @@ class EmbeddingService:
         ✅ STEP 3 — Load Model
         """
         self.model_name = model_name
-        self.api_key = os.getenv("NOMIC_API_KEY")
+        # Note: the .env uses NOMIC_KEY, so we load that one
+        self.api_key = os.getenv("NOMIC_KEY") or os.getenv("NOMIC_API_KEY")
         self.api_url = "https://api-atlas.nomic.ai/v1/embedding/text"
         
         if not self.api_key:
