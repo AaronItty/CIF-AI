@@ -22,7 +22,9 @@ CLIENT_SUPABASE_ANON_KEY = os.getenv("CLIENT_SUPABASE_ANON_KEY")
 
 # ── Internal / Platform Database (for escalation, KB, etc.) ────
 OUR_SUPABASE_URL = os.getenv("OUR_SUPABASE_URL")
-OUR_SUPABASE_ANON_KEY = os.getenv("OUR_SUPABASE_ANON_KEY")
+OUR_SUPABASE_KEY = os.getenv("OUR_SUPABASE_KEY") or os.getenv("OUR_SUPABASE_ANON_KEY")
+NOMIC_API_KEY = os.getenv("NOMIC_KEY") or os.getenv("NOMIC_API_KEY")
+DEFAULT_ORG_ID = os.getenv("DEFAULT_ORG_ID", "302945a7-2a4b-4b78-a764-daa12777fbaf")
 
 
 def _get_client_db() -> Client:
@@ -34,9 +36,9 @@ def _get_client_db() -> Client:
 
 def _get_platform_db() -> Client:
     """Returns a Supabase client for the internal platform database."""
-    if not OUR_SUPABASE_URL or not OUR_SUPABASE_ANON_KEY:
-        raise ValueError("OUR_SUPABASE_URL and OUR_SUPABASE_ANON_KEY must be set in .env")
-    return create_client(OUR_SUPABASE_URL, OUR_SUPABASE_ANON_KEY)
+    if not OUR_SUPABASE_URL or not OUR_SUPABASE_KEY:
+        raise ValueError("OUR_SUPABASE_URL and OUR_SUPABASE_KEY must be set in .env")
+    return create_client(OUR_SUPABASE_URL, OUR_SUPABASE_KEY)
 
 
 # ═══════════════════════════════════════════════════════════════
@@ -311,6 +313,77 @@ async def get_conversation_history(session_id: str, max_messages: int = 20) -> d
         }
     except Exception as e:
         return {"status": "error", "message": str(e)}
+
+
+# ═══════════════════════════════════════════════════════════════
+# RAG KNOWLEDGE BASE TOOL
+# ═══════════════════════════════════════════════════════════════
+
+@mcp.tool()
+async def query_knowledge_base(query: str) -> dict:
+    """
+    Search the organization's knowledge base for information relevant to the query.
+    Use this when the customer asks about policies, FAQs, procedures, shipping,
+    returns, store hours, or any information that may be in uploaded documents.
+    Returns the most relevant text fragments from the knowledge base.
+    """
+    try:
+        import requests
+
+        if not NOMIC_API_KEY:
+            return {"status": "error", "message": "NOMIC_API_KEY not configured."}
+
+        # 1. Embed the query using Nomic API
+        embed_response = requests.post(
+            "https://api-atlas.nomic.ai/v1/embedding/text",
+            headers={
+                "Authorization": f"Bearer {NOMIC_API_KEY}",
+                "Content-Type": "application/json"
+            },
+            json={
+                "model": "nomic-embed-text-v1.5",
+                "texts": [f"search_query: {query}"]
+            }
+        )
+        embed_response.raise_for_status()
+        query_embedding = embed_response.json().get("embeddings", [[]])[0]
+
+        if not query_embedding:
+            return {"status": "error", "message": "Failed to generate embedding for query."}
+
+        # 2. Vector search in OUR_SUPABASE
+        sb = _get_platform_db()
+        result = sb.rpc("match_documents", {
+            "query_embedding": query_embedding,
+            "match_threshold": 0.60,
+            "match_count": 3
+        }).execute()
+
+        matches = result.data or []
+
+        if not matches:
+            return {
+                "status": "success",
+                "results": [],
+                "message": f"No relevant knowledge found for '{query}'. Try rephrasing or ask the customer to clarify."
+            }
+
+        # 3. Return the matching chunks
+        formatted = []
+        for match in matches:
+            formatted.append({
+                "content": match.get("content", ""),
+                "similarity": round(match.get("similarity", 0), 3)
+            })
+
+        return {
+            "status": "success",
+            "results": formatted,
+            "message": f"Found {len(formatted)} relevant knowledge base entries."
+        }
+
+    except Exception as e:
+        return {"status": "error", "message": f"Knowledge base search failed: {str(e)}"}
 
 
 # ═══════════════════════════════════════════════════════════════

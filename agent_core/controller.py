@@ -119,6 +119,19 @@ class Controller:
         if action_type == "call_tool":
             tool_name = intent_data.get("action")
             tool_args = intent_data.get("entities", {})
+            
+            # Validate required args before calling the tool
+            tool_schema = next((t for t in self._available_tools if t["name"] == tool_name), None)
+            if tool_schema:
+                schema = tool_schema.get("input_schema", {})
+                required_params = schema.get("required", [])
+                missing_params = [p for p in required_params if p not in tool_args or not tool_args[p]]
+                if missing_params:
+                    print(f"[Controller] Tool '{tool_name}' missing required args: {missing_params}")
+                    result["tool_result"] = f"Cannot call {tool_name}: missing required parameters: {', '.join(missing_params)}"
+                    result["status"] = "error"
+                    return result
+            
             print(f"[Controller] Calling tool '{tool_name}' with args: {tool_args}")
             try:
                 from fastmcp import Client

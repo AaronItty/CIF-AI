@@ -68,6 +68,119 @@ class PlanningLoop:
         
         return tool_name, tool_result, action_result
 
+    def _resolve_buy_item_ids(self, entities: dict, memory: list) -> dict:
+        """
+        Resolve human-readable store/product names to UUIDs by scanning
+        past search_item results stored in conversation memory.
+        """
+        import re as _re
+        
+        uuid_pattern = _re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$', _re.I)
+        
+        store_id = str(entities.get("store_id", "")).strip()
+        product_id = str(entities.get("product_id", "")).strip()
+        
+        # If both are already UUIDs, nothing to do
+        if uuid_pattern.match(store_id) and uuid_pattern.match(product_id):
+            return entities
+        
+        # Scan memory for search_item results
+        store_map = {}   # store_name.lower() -> store_id UUID
+        product_map = {} # product_name.lower() -> product_id UUID
+        
+        for msg in memory:
+            content = str(msg.get("content", ""))
+            if "search_item" not in content or "results" not in content:
+                continue
+            
+            # Try to extract the JSON from tool result
+            try:
+                import json as _json
+                # Find the dict inside the message
+                start = content.index("{")
+                json_str = content[start:]
+                data = _json.loads(json_str)
+                
+                results = data.get("results", [])
+                for item in results:
+                    s_id = item.get("store_id", "")
+                    s_name = item.get("store_name", "")
+                    p_id = item.get("product_id", "")
+                    p_name = item.get("item_name", "") or item.get("product_name", "")
+                    
+                    if s_name and s_id:
+                        store_map[s_name.lower()] = s_id
+                    if p_name and p_id:
+                        product_map[p_name.lower()] = p_id
+            except (ValueError, _json.JSONDecodeError, Exception):
+                continue
+        
+        # Resolve store_id
+        if not uuid_pattern.match(store_id) and store_map:
+            store_id_lower = store_id.lower()
+            # Try exact match first, then partial match
+            resolved = store_map.get(store_id_lower)
+            if not resolved:
+                for name, uid in store_map.items():
+                    if store_id_lower in name or name in store_id_lower:
+                        resolved = uid
+                        break
+            if resolved:
+                print(f"[PlanningLoop] Resolved store_id: '{store_id}' -> '{resolved}'")
+                entities["store_id"] = resolved
+        
+        # Resolve product_id
+        if not uuid_pattern.match(product_id) and product_map:
+            product_id_lower = product_id.lower()
+            resolved = product_map.get(product_id_lower)
+            if not resolved:
+                for name, uid in product_map.items():
+                    if product_id_lower in name or name in product_id_lower:
+                        resolved = uid
+                        break
+            if resolved:
+                print(f"[PlanningLoop] Resolved product_id: '{product_id}' -> '{resolved}'")
+                entities["product_id"] = resolved
+        
+        return entities
+
+    async def _fetch_kb_context(self, query_text: str) -> str:
+        """
+        Query the knowledge base via MCP tool and return relevant content.
+        Returns formatted KB context string, or None if no results.
+        """
+        try:
+            from fastmcp import Client
+            async with Client(self.controller.mcp_url) as client:
+                result = await client.call_tool("query_knowledge_base", {"query": query_text})
+                
+                result_text = ""
+                for block in (result.content if hasattr(result, 'content') else result):
+                    if hasattr(block, 'text'):
+                        result_text += block.text
+                
+                import json
+                data = json.loads(result_text)
+                results = data.get("results", [])
+                
+                if not results:
+                    return None
+                
+                # Format KB content for injection
+                kb_parts = []
+                for i, r in enumerate(results, 1):
+                    content = r.get("content", "")
+                    sim = r.get("similarity", 0)
+                    kb_parts.append(f"[KB #{i} (relevance: {sim})] {content}")
+                
+                kb_context = "\n\n".join(kb_parts)
+                print(f"[PlanningLoop] KB context fetched: {len(results)} entries")
+                return kb_context
+                
+        except Exception as e:
+            print(f"[PlanningLoop] KB fetch failed (non-critical): {e}")
+            return None
+
     async def process_message(self, normalized_msg: NormalizedMessage) -> dict:
         """
         Flow:
@@ -163,36 +276,145 @@ class PlanningLoop:
                     original_intent, accumulated_tool_results, memory
                 )
             else:
-                # Normal tool call (search_item, buy_item, escalate, etc.)
-                _, tool_result, _ = await self._call_tool_with_retries(
-                    decision, intent, normalized_msg, session_id
-                )
+                # For buy_item: validate required fields and confirm before executing
+                if tool_name == "buy_item":
+                    entities = intent.get("entities", {})
+                    
+                    # Resolve store_id and product_id from search results if they're names, not UUIDs
+                    entities = self._resolve_buy_item_ids(entities, memory)
+                    intent["entities"] = entities
+                    
+                    # Check for missing or placeholder values
+                    required_fields = {
+                        "customer_name": "your full name",
+                        "customer_phone": "your phone number",
+                        "customer_email": "your email address",
+                        "pincode": "your delivery pincode"
+                    }
+                    missing = []
+                    for field, label in required_fields.items():
+                        val = str(entities.get(field, "")).strip()
+                        if not val or val.lower() in ["unknown", "none", ""]:
+                            missing.append(label)
+                    
+                    if missing:
+                        # Ask for missing details instead of calling tool
+                        missing_str = ", ".join(missing)
+                        final_response_text = (
+                            f"Before I can place this order, I still need the following: {missing_str}. "
+                            "Could you please provide these details?"
+                        )
+                    else:
+                        # Check if we already confirmed — look for a confirmation message
+                        # in recent history that the user replied "yes" to
+                        last_messages = memory[-4:] if len(memory) >= 4 else memory
+                        already_confirmed = False
+                        for msg in last_messages:
+                            content = str(msg.get("content", ""))
+                            if msg.get("role") == "assistant" and "confirm" in content.lower() and "order" in content.lower():
+                                already_confirmed = True
+                                break
+                        
+                        if not already_confirmed:
+                            # Present order summary and ask for confirmation
+                            product_name = entities.get("product_id", "the item")
+                            qty = entities.get("quantity", 1)
+                            addr = entities.get("delivery_address", "pickup")
+                            pin = entities.get("pincode", "")
+                            name = entities.get("customer_name", "")
+                            phone = entities.get("customer_phone", "")
+                            email = entities.get("customer_email", "")
+                            
+                            final_response_text = (
+                                f"Please confirm the following order details:\n\n"
+                                f"• **Name**: {name}\n"
+                                f"• **Phone**: {phone}\n"
+                                f"• **Email**: {email}\n"
+                                f"• **Delivery Address**: {addr}\n"
+                                f"• **Pincode**: {pin}\n"
+                                f"• **Quantity**: {qty}\n\n"
+                                "Reply **yes** to confirm and place the order, or let me know if anything needs to be changed."
+                            )
+                        else:
+                            # User confirmed — actually place the order
+                            _, tool_result, _ = await self._call_tool_with_retries(
+                                decision, intent, normalized_msg, session_id
+                            )
+                            
+                            if tool_result is not None:
+                                accumulated_tool_results[tool_name] = tool_result
+                                memory = await self.state_manager.get_session_state(session_id)
+                                final_response_text = await self.reasoning.generate_response(
+                                    original_intent, accumulated_tool_results, memory
+                                )
+                            else:
+                                final_response_text = (
+                                    "I'm sorry, I'm having trouble placing the order right now. "
+                                    "I am escalating to support."
+                                )
+                else:
+                    # Other tools (search_item, escalate, etc.) — call directly
+                    _, tool_result, _ = await self._call_tool_with_retries(
+                        decision, intent, normalized_msg, session_id
+                    )
+                    
+                    if tool_result is not None:
+                        accumulated_tool_results[tool_name] = tool_result
+                        memory = await self.state_manager.get_session_state(session_id)
+                        final_response_text = await self.reasoning.generate_response(
+                            original_intent, accumulated_tool_results, memory
+                        )
+                    else:
+                        final_response_text = (
+                            "I'm sorry, I'm having trouble completing this request right now. "
+                            "I am escalating to support."
+                        )
                 
-                if tool_result is not None:
-                    accumulated_tool_results[tool_name] = tool_result
-                    memory = await self.state_manager.get_session_state(session_id)
-                    final_response_text = await self.reasoning.generate_response(
-                        original_intent, accumulated_tool_results, memory
+        elif decision in ["ask_clarification", "escalate"]:
+            # If the LLM wanted buy_item but confidence was low, 
+            # run our validation to ask for specific missing fields
+            intended_action = intent.get("action", "")
+            if decision == "ask_clarification" and intended_action == "buy_item":
+                entities = intent.get("entities", {})
+                required_fields = {
+                    "customer_name": "your full name",
+                    "customer_phone": "your phone number",
+                    "customer_email": "your email address",
+                    "pincode": "your delivery pincode",
+                    "delivery_address": "your delivery address"
+                }
+                missing = []
+                for field, label in required_fields.items():
+                    val = str(entities.get(field, "")).strip()
+                    if not val or val.lower() in ["unknown", "none", ""]:
+                        missing.append(label)
+                
+                if missing:
+                    missing_str = ", ".join(missing)
+                    final_response_text = (
+                        f"I'd love to help you place that order! To proceed, I'll need: {missing_str}. "
+                        "Could you please share these details?"
                     )
                 else:
                     final_response_text = (
-                        "I'm sorry, I'm having trouble completing this request right now. "
-                        "I am escalating to support."
+                        "I'd like to confirm your order details. Could you reply with 'yes' to place the order?"
                     )
-                
-        elif decision in ["ask_clarification", "escalate"]:
-            action_result = await self.controller.execute_action(
-                decision, intent,
-                session_id=session_id,
-                user_id=normalized_msg.user_id,
-                channel=normalized_msg.channel
-            )
-            final_response_text = action_result.get("message")
+            else:
+                action_result = await self.controller.execute_action(
+                    decision, intent,
+                    session_id=session_id,
+                    user_id=normalized_msg.user_id,
+                    channel=normalized_msg.channel
+                )
+                final_response_text = action_result.get("message")
             
         elif decision == "respond":
-            # No tool needed — generate a conversational reply
+            # Always check KB first before generating a direct response
+            kb_context = await self._fetch_kb_context(normalized_msg.text)
+            if kb_context:
+                accumulated_tool_results["knowledge_base"] = kb_context
             final_response_text = await self.reasoning.generate_response(
-                original_intent, {}, memory
+                original_intent, accumulated_tool_results, memory
             )
              
         # Save the final AI response to memory
