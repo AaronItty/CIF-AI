@@ -20,18 +20,23 @@ class ReasoningEngine:
         self.intent_model = "llama-3.1-8b-instant" 
         self.chat_model = "llama-3.1-8b-instant"
         
-    async def extract_intent(self, text: str, context: List[Dict[str, Any]], tool_descriptions: str = "") -> dict:
+    async def extract_intent(self, text: str, context: List[Dict[str, Any]], tool_descriptions: str = "", user_context: dict = None) -> dict:
         """
         Extract user intent, entities, and requested actions from text.
         Forces the LLM to output a structured JSON response.
         
         tool_descriptions: A formatted string of available MCP tools, dynamically
                           discovered from the MCP server at runtime.
+        user_context: Optional dict with known info about the user, e.g.
+                     {"email": "user@example.com", "channel": "email"}
         """
         # Build tool instruction based on what's actually available
         if tool_descriptions and tool_descriptions != "No tools are currently available.":
             tool_instruction = (
                 f"You have access to the following tools:\n{tool_descriptions}\n\n"
+                "Decide intelligently whether to use a tool, ask for clarification, or respond directly. "
+                "If you need more information from the user, be SPECIFIC about exactly what you need "
+                "(e.g. 'What is your email address?' not 'Could you provide more details?'). "
                 "If the user's intent matches a tool, set 'action' to the tool name and extract "
                 "the relevant parameters into 'entities'. If no tool matches, set 'action' to 'none'."
             )
@@ -40,9 +45,22 @@ class ReasoningEngine:
                 "No tools are currently available. You must set 'action' to 'none' for all requests."
             )
         
+        # Add user context if available
+        user_context_str = ""
+        if user_context:
+            user_context_str = (
+                "\nKnown information about the current user: "
+                + ", ".join(f"{k}: {v}" for k, v in user_context.items())
+                + ". Use this information when filling in tool parameters instead of using placeholder values like 'unknown'."
+            )
+
         system_prompt = (
-            "You are an intent extraction engine. Analyze the user's input and determine what they want to do. "
+            "You are an intent extraction engine for a customer service AI agent. "
+            "Analyze the user's input and determine what they want to do. "
+            "Use your best judgement to decide whether to call a tool, ask for clarification, or respond directly. "
+            "When asking for clarification, always specify exactly what information you need — never give vague responses. "
             f"{tool_instruction} "
+            f"{user_context_str} "
             "You must respond in pure JSON format matching this schema: "
             '{"intent": "description of intent", "action": "tool_name_or_none", '
             '"entities": {"key": "value"}, "confidence": 0.0-1.0}'

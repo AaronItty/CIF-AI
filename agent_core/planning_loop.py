@@ -36,16 +36,49 @@ class PlanningLoop:
             await self.controller.discover_tools()
             self._tools_discovered = True
         
+    async def _call_tool_with_retries(self, decision, intent, normalized_msg, session_id, max_retries=3):
+        """Call a tool with retries. Returns (tool_name, tool_result_or_None, action_result)."""
+        tool_name = intent.get("action")
+        tool_args = intent.get("entities", {})
+        tool_result = None
+        action_result = {}
+        
+        for attempt in range(1, max_retries + 1):
+            print(f"[PlanningLoop] Tool call attempt {attempt}/{max_retries} for '{tool_name}'")
+            action_result = await self.controller.execute_action(
+                decision, intent,
+                session_id=session_id,
+                user_id=normalized_msg.user_id,
+                channel=normalized_msg.channel
+            )
+            
+            if action_result.get("status") == "success":
+                tool_result = action_result.get("tool_result")
+                print(f"[PlanningLoop] Tool '{tool_name}' succeeded on attempt {attempt}")
+                break
+            else:
+                print(f"[PlanningLoop] Tool '{tool_name}' failed on attempt {attempt}: {action_result.get('tool_result')}")
+        
+        # Log and save to memory
+        await self.state_manager.log_tool_usage(session_id, tool_name, tool_args, action_result)
+        await self.state_manager.update_session_state(session_id, {
+            "role": "system",
+            "content": f"Tool '{tool_name}' returned: {tool_result or action_result.get('tool_result')}"
+        })
+        
+        return tool_name, tool_result, action_result
+
     async def process_message(self, normalized_msg: NormalizedMessage) -> dict:
         """
-        while not resolved:
+        Flow:
             1. Discover tools (once)
-            2. Extract intent (with tool descriptions)
+            2. Extract intent (once per message)
             3. Evaluate via controller
-            4. Decide: respond / call tool / ask clarification / escalate
-            5. Execute action
-            6. Update memory
-            7. Loop
+            4. Execute action
+            5. If history tool → inject context, re-extract intent, call next tool
+            6. If other tool succeeded → generate response immediately
+            7. If tool failed → retry up to 3x
+            8. If no tool needed → respond or clarify
         """
         session_id = normalized_msg.session_id
         message = normalized_msg.message
@@ -64,78 +97,103 @@ class PlanningLoop:
             "user_id": normalized_msg.user_id
         })
         
-        resolved = False
         final_response_text = ""
         
-        # We might accumulate tool results if the LLM calls multiple tools in succession
-        accumulated_tool_results = {}
-        original_intent = {}
-
-        # Failsafe loop counter to prevent infinite loops
-        loops = 0
-        MAX_LOOPS = 5
+        # Extract user email from user_id (format: "Name <email>" or just "email")
+        import re
+        user_id = normalized_msg.user_id
+        email_match = re.search(r'<(.+?)>', user_id)
+        user_email = email_match.group(1) if email_match else user_id
+        user_context = {
+            "email": user_email,
+            "channel": normalized_msg.channel
+        }
         
-        while not resolved and loops < MAX_LOOPS:
-            loops += 1
+        # Step 1: Load memory
+        memory = await self.state_manager.get_session_state(session_id)
+        print(f"[DEBUG] PlanningLoop: Loaded {len(memory)} messages from memory for session {session_id}")
+        
+        # Create a simplified state dict for the Policy Engine evaluation
+        eval_state = {
+            "user_role": "admin",
+            "latest_user_message": message,
+            "consecutive_tool_failures": 0
+        }
+        
+        # Step 2: Extract Intent ONCE using Groq (with dynamic tool descriptions)
+        intent = await self.reasoning.extract_intent(message, memory, tool_descriptions, user_context=user_context)
+        original_intent = intent
+        
+        # Step 3: Evaluate & Decide using strict deterministic Controller
+        decision = await self.controller.evaluate(intent, eval_state)
+        
+        # Step 4: Execute based on decision
+        if decision == "call_tool":
+            tool_name = intent.get("action")
+            accumulated_tool_results = {}
             
-            # Step 1: Load memory
-            memory = await self.state_manager.get_session_state(session_id)
-            print(f"[DEBUG] PlanningLoop: Loaded {len(memory)} messages from memory for session {session_id}")
-            
-            # Create a simplified state dict for the Policy Engine evaluation
-            eval_state = {
-                "user_role": "admin",  # Hardcoded for now, would fetch from DB based on user_id
-                "latest_user_message": message,
-                "consecutive_tool_failures": 0  # Would compute from memory in a real app
-            }
-            
-            # Step 2: Extract Intent using Groq (with dynamic tool descriptions)
-            intent = await self.reasoning.extract_intent(message, memory, tool_descriptions)
-            if loops == 1:
-                 original_intent = intent
-            
-            # Step 3: Evaluate & Decide using strict deterministic Controller
-            decision = await self.controller.evaluate(intent, eval_state)
-            
-            # Step 4: Execute Action (run tool via MCP or format standard response)
+            # Special handling: if the agent wants conversation history first,
+            # fetch it, then re-extract intent for a follow-up action
+            if tool_name == "get_conversation_history":
+                print("[PlanningLoop] Agent requested conversation history — fetching context first")
+                _, hist_result, _ = await self._call_tool_with_retries(
+                    decision, intent, normalized_msg, session_id
+                )
+                
+                if hist_result is not None:
+                    accumulated_tool_results["get_conversation_history"] = hist_result
+                    
+                    # Re-extract intent now that context is richer
+                    memory = await self.state_manager.get_session_state(session_id)
+                    intent = await self.reasoning.extract_intent(message, memory, tool_descriptions, user_context=user_context)
+                    decision = await self.controller.evaluate(intent, eval_state)
+                    tool_name = intent.get("action")
+                    
+                    # If the agent now wants another tool, call it
+                    if decision == "call_tool" and tool_name != "get_conversation_history":
+                        _, tool_result, _ = await self._call_tool_with_retries(
+                            decision, intent, normalized_msg, session_id
+                        )
+                        if tool_result is not None:
+                            accumulated_tool_results[tool_name] = tool_result
+                
+                # Generate response with all accumulated results
+                memory = await self.state_manager.get_session_state(session_id)
+                final_response_text = await self.reasoning.generate_response(
+                    original_intent, accumulated_tool_results, memory
+                )
+            else:
+                # Normal tool call (search_item, buy_item, escalate, etc.)
+                _, tool_result, _ = await self._call_tool_with_retries(
+                    decision, intent, normalized_msg, session_id
+                )
+                
+                if tool_result is not None:
+                    accumulated_tool_results[tool_name] = tool_result
+                    memory = await self.state_manager.get_session_state(session_id)
+                    final_response_text = await self.reasoning.generate_response(
+                        original_intent, accumulated_tool_results, memory
+                    )
+                else:
+                    final_response_text = (
+                        "I'm sorry, I'm having trouble completing this request right now. "
+                        "I am escalating to support."
+                    )
+                
+        elif decision in ["ask_clarification", "escalate"]:
             action_result = await self.controller.execute_action(
                 decision, intent,
                 session_id=session_id,
                 user_id=normalized_msg.user_id,
                 channel=normalized_msg.channel
             )
+            final_response_text = action_result.get("message")
             
-            # Step 5: Update loop control & memory
-            if decision == "call_tool":
-                # A tool was executed. Log it and loop again to let the LLM see the result!
-                tool_name = intent.get("action")
-                await self.state_manager.log_tool_usage(
-                    session_id, 
-                    tool_name, 
-                    intent.get("entities", {}), 
-                    action_result
-                )
-                # Save tool output as a "system" or "tool" message so Groq can read it next loop
-                await self.state_manager.update_session_state(session_id, {
-                    "role": "system",
-                    "content": f"Tool '{tool_name}' returned: {action_result.get('tool_result')}"
-                })
-                # Store accumulated results for final response generation
-                accumulated_tool_results[tool_name] = action_result.get('tool_result')
-                
-            elif decision in ["ask_clarification", "escalate"]:
-                # Controller decided to stop and ask the user a question or handoff
-                resolved = True
-                final_response_text = action_result.get("message")
-                
-            elif decision == "respond":
-                # Controller says we have all info. We use Groq to generate a final conversational reply
-                resolved = True
-                final_response_text = await self.reasoning.generate_response(original_intent, accumulated_tool_results, memory)
-                
-        # Failsafe breach
-        if not resolved:
-             final_response_text = "I'm sorry, I'm having trouble completing this request right now. I am escalating to support."
+        elif decision == "respond":
+            # No tool needed — generate a conversational reply
+            final_response_text = await self.reasoning.generate_response(
+                original_intent, {}, memory
+            )
              
         # Save the final AI response to memory
         await self.state_manager.update_session_state(session_id, {

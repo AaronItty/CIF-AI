@@ -119,15 +119,17 @@ class Controller:
         if action_type == "call_tool":
             tool_name = intent_data.get("action")
             tool_args = intent_data.get("entities", {})
+            print(f"[Controller] Calling tool '{tool_name}' with args: {tool_args}")
             try:
                 from fastmcp import Client
                 
                 async with Client(self.mcp_url) as client:
                     tool_result = await client.call_tool(tool_name, tool_args)
                     
-                    # tool_result is a list of content blocks; extract text
+                    # tool_result is a CallToolResult; access .content for blocks
                     result_text = ""
-                    for block in tool_result:
+                    content_blocks = tool_result.content if hasattr(tool_result, 'content') else tool_result
+                    for block in content_blocks:
                         if hasattr(block, 'text'):
                             result_text += block.text
                     
@@ -138,12 +140,19 @@ class Controller:
                         result["tool_result"] = result_text
                         
                 result["status"] = "success"
+                print(f"[Controller] Tool '{tool_name}' returned successfully")
             except Exception as e:
+                print(f"[Controller] Tool '{tool_name}' FAILED: {e}")
                 result["tool_result"] = f"Error executing {tool_name}: {str(e)}"
                 result["status"] = "error"
                 
         elif action_type == "ask_clarification":
-            result["message"] = "I need a bit more clarification to confidently proceed. Could you provide more details?"
+            # Use the LLM's intent to generate a specific clarification question
+            intent_desc = intent_data.get("intent", "")
+            if intent_desc:
+                result["message"] = f"I'd like to help, but I need some more information: {intent_desc}"
+            else:
+                result["message"] = "Could you tell me more about what you're looking for? I want to make sure I help you with the right thing."
             
         elif action_type == "escalate":
             # Auto-escalation triggered by PolicyEngine (e.g., 3 consecutive failures).

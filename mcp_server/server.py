@@ -45,7 +45,10 @@ def _get_platform_db() -> Client:
 
 @mcp.tool()
 async def search_item(item_name: str) -> dict:
-    """Search for an item across available stores on the backend to find store_id and product_id."""
+    """
+    Search for a product or item by name across all available stores.
+    Returns matching products with store name, price, product_id, and store_id.
+    """
     try:
         sb = _get_client_db()
         products_res = sb.table("products").select("id, name, price, store_id") \
@@ -83,9 +86,16 @@ async def buy_item(
     customer_name: str,
     customer_phone: str,
     customer_email: str,
+    pincode: str,
     delivery_address: Optional[str] = None
 ) -> dict:
-    """Place an order for a specific item using product_id and store_id from search_item results."""
+    """
+    Place an order to buy a specific product for the customer.
+    Requires store_id and product_id (from search_item results), quantity,
+    customer_name, customer_phone, customer_email, and pincode.
+    delivery_address is optional (defaults to pickup if not provided).
+    Do not use placeholder values like 'unknown' — ask the user for real details first.
+    """
     try:
         import httpx
 
@@ -110,7 +120,7 @@ async def buy_item(
                 "method": "pickup" if not delivery_address else "delivery",
                 "address": delivery_address,
                 "lat": None, "lng": None, "date": None,
-                "time_slot": None, "pincode": None,
+                "time_slot": None, "pincode": pincode,
                 "landmark": None, "notes": None
             },
             "items": [
@@ -151,8 +161,7 @@ async def buy_item(
 async def escalate_to_human(session_id: str, reason: str, user_contact: str = "", channel: str = "unknown") -> dict:
     """
     Transfer the current conversation to a human support agent.
-    Use this when the AI cannot confidently resolve the customer's issue,
-    or when the customer explicitly requests to speak with a human.
+    Provide a clear reason summarizing why the conversation is being escalated.
     
     This tool will:
     1. Update the conversation status in the database
@@ -263,9 +272,51 @@ async def escalate_to_human(session_id: str, reason: str, user_contact: str = ""
 
 
 # ═══════════════════════════════════════════════════════════════
+# CONVERSATION HISTORY TOOL
+# ═══════════════════════════════════════════════════════════════
+
+@mcp.tool()
+async def get_conversation_history(session_id: str, max_messages: int = 20) -> dict:
+    """
+    Retrieve past conversation messages for a given session.
+    Use this when the user references something from a previous interaction,
+    or when you need context about what was discussed earlier in the conversation.
+    Returns the most recent messages (up to max_messages) with role and content.
+    """
+    try:
+        sb = _get_platform_db()
+        resp = sb.table("messages").select("role, content, created_at") \
+            .eq("session_id", session_id) \
+            .order("created_at", desc=True) \
+            .limit(max_messages) \
+            .execute()
+        
+        messages = resp.data or []
+        # Reverse to chronological order
+        messages.reverse()
+        
+        formatted = []
+        for msg in messages:
+            formatted.append({
+                "role": msg.get("role", "unknown"),
+                "content": msg.get("content", "")[:500],  # Truncate long messages
+                "timestamp": msg.get("created_at", "")
+            })
+        
+        return {
+            "status": "success",
+            "session_id": session_id,
+            "message_count": len(formatted),
+            "messages": formatted
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+
+
+# ═══════════════════════════════════════════════════════════════
 # SERVER ENTRY POINT
 # ═══════════════════════════════════════════════════════════════
 
 if __name__ == "__main__":
     print("▶ Starting CIF-AI MCP Tool Server on port 8004...")
-    mcp.run(transport="sse", port=8004)
+    mcp.run(transport="sse", host="0.0.0.0", port=8004)

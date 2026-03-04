@@ -1,0 +1,40 @@
+# Use an official Python runtime as a parent image
+FROM python:3.11-slim
+
+# Set environment variables
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONPATH=/app
+
+# Set the working directory
+WORKDIR /app
+
+# Install system dependencies (if any are needed for particular python packages)
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the requirements file into the container
+COPY requirements.txt .
+
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy the rest of the application code
+COPY . .
+
+# Expose ports that might be used by the different services
+# Dashboard API
+EXPOSE 8001
+# KB Service
+EXPOSE 8000
+# Agent Core
+EXPOSE 8002
+# Email Service
+EXPOSE 8003
+# MCP Server
+EXPOSE 8004
+
+# The command will be overridden by docker-compose for each specific service
+CMD ["python", "main.py"]
