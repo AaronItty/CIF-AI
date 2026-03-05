@@ -6,7 +6,7 @@ Now accepts dynamic tool descriptions from the Controller for prompt injection.
 """
 
 import json
-from groq import Groq
+from groq import AsyncGroq
 from typing import Dict, Any, List
 
 class ReasoningEngine:
@@ -15,7 +15,7 @@ class ReasoningEngine:
     """
     
     def __init__(self, api_key: str):
-        self.client = Groq(api_key=api_key)
+        self.client = AsyncGroq(api_key=api_key)
         # Using a fast reasoning model for intent extraction
         self.intent_model = "llama-3.1-8b-instant" 
         self.chat_model = "llama-3.1-8b-instant"
@@ -99,16 +99,21 @@ class ReasoningEngine:
              print(f"  - [{role}]: {content[:50]}...")
              messages.append({"role": role, "content": content})
              
-        messages.append({"role": "user", "content": text})
-        print(f"  - [CURRENT USER]: {text[:50]}...")
-        print(f"------------------------------------\n")
+        print(f"  - [CURRENT USER]: {text[:50]}...", flush=True)
+        print(f"------------------------------------\n", flush=True)
         
-        response = self.client.chat.completions.create(
-            messages=messages,
-            model=self.intent_model,
-            response_format={"type": "json_object"},
-            temperature=0.0 # Deterministic extraction
-        )
+        try:
+            print(f"[REASONING] Sending request to Groq model {self.intent_model}...", flush=True)
+            response = await self.client.chat.completions.create(
+                messages=messages,
+                model=self.intent_model,
+                response_format={"type": "json_object"},
+                temperature=0.0 # Deterministic extraction
+            )
+            print(f"[REASONING] Groq request complete.", flush=True)
+        except Exception as e:
+            print(f"[REASONING] FATAL GROQ ERROR: {e}", flush=True)
+            raise e
         
         result_content = response.choices[0].message.content
         return json.loads(result_content)
@@ -137,11 +142,17 @@ class ReasoningEngine:
         user_prompt = f"Original Intent: {intent.get('intent')}\nTool Execution Results: {json.dumps(tool_results)}"
         messages.append({"role": "user", "content": user_prompt})
         
-        response = self.client.chat.completions.create(
-            messages=messages,
-            model=self.chat_model,
-            temperature=0.5
-        )
+        try:
+            print(f"[REASONING] Generating final response with {self.chat_model}...", flush=True)
+            response = await self.client.chat.completions.create(
+                messages=messages,
+                model=self.chat_model,
+                temperature=0.5
+            )
+            print(f"[REASONING] Final response received.", flush=True)
+        except Exception as e:
+            print(f"[REASONING] GROQ GENERATION ERROR: {e}", flush=True)
+            raise e
         
         return response.choices[0].message.content
 
@@ -160,12 +171,18 @@ class ReasoningEngine:
         messages = [{"role": "system", "content": system_prompt}]
         for msg in context[-15:]:  # Use last 15 messages for summary
             messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
-
-        response = self.client.chat.completions.create(
-            messages=messages,
-            model=self.chat_model,
-            temperature=0.3, # More focused/stable for summaries
-            max_tokens=60
-        )
         
+        try:
+            print(f"[REASONING] Summarizing conversation history...", flush=True)
+            response = await self.client.chat.completions.create(
+                messages=messages,
+                model=self.chat_model,
+                temperature=0.3, # More focused/stable for summaries
+                max_tokens=60
+            )
+            print(f"[REASONING] Summary generation complete.", flush=True)
+        except Exception as e:
+            print(f"[REASONING] SUMMARIZATION ERROR: {e}", flush=True)
+            return "Conversation in progress" # Fail gracefully for summary
+
         return response.choices[0].message.content.strip()

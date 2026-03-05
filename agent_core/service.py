@@ -40,6 +40,11 @@ async def process_message(msg: NormalizedMessage):
         result = await planning_loop.process_message(msg)
         return result
     except Exception as e:
+        import traceback
+        import sys
+        print(f"[ERROR] Agent Core Exception: {e}", flush=True)
+        traceback.print_exc(file=sys.stdout)
+        sys.stdout.flush()
         raise HTTPException(status_code=500, detail=str(e))
 
 if __name__ == "__main__":

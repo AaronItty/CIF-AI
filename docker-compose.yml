@@ -11,8 +11,7 @@ services:
       - .env
     volumes:
       - .:/app
-      - ./credentials.json:/app/secrets/credentials.json
-      - ./token.json:/app/secrets/token.json
+      - ./secrets:/app/secrets
     networks:
       - cifai-network
     restart: unless-stopped
@@ -52,8 +51,7 @@ services:
       - AGENT_CORE_URL=http://agent-core:8002/api/v1/process_message
     volumes:
       - .:/app
-      - ./credentials.json:/app/secrets/credentials.json
-      - ./token.json:/app/secrets/token.json
+      - ./secrets:/app/secrets
     networks:
       - cifai-network
     depends_on:
@@ -92,6 +90,22 @@ services:
       - /app/node_modules # Prevents local node_modules from overwriting container's
     environment:
       - NODE_ENV=development
+    restart: unless-stopped
+
+  telegram-bot:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: cifai-telegram-bot
+    command: python run_telegram_bot.py
+    env_file:
+      - .env
+    environment:
+      - AGENT_CORE_URL=http://agent-core:8002/api/v1/process_message
+    networks:
+      - cifai-network
+    depends_on:
+      - agent-core
     restart: unless-stopped
 
 networks:

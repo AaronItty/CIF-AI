@@ -193,6 +193,8 @@ class PlanningLoop:
             7. If tool failed → retry up to 3x
             8. If no tool needed → respond or clarify
         """
+        accumulated_tool_results = {}
+        print("[DEBUG] PlanningLoop: accumulated_tool_results initialized", flush=True)
         session_id = normalized_msg.session_id
         message = normalized_msg.message
         
@@ -243,7 +245,6 @@ class PlanningLoop:
         # Step 4: Execute based on decision
         if decision == "call_tool":
             tool_name = intent.get("action")
-            accumulated_tool_results = {}
             
             # Special handling: if the agent wants conversation history first,
             # fetch it, then re-extract intent for a follow-up action
@@ -410,7 +411,7 @@ class PlanningLoop:
             
         elif decision == "respond":
             # Always check KB first before generating a direct response
-            kb_context = await self._fetch_kb_context(normalized_msg.text)
+            kb_context = await self._fetch_kb_context(normalized_msg.message)
             if kb_context:
                 accumulated_tool_results["knowledge_base"] = kb_context
             final_response_text = await self.reasoning.generate_response(
@@ -430,6 +431,7 @@ class PlanningLoop:
             summary = await self.reasoning.summarize_conversation(updated_memory)
             
             # Persist summary and tags
+            category = intent.get("category")
             tags = [category] if (category and category != "one_of_the_labels_above") else None
             await self.state_manager.update_metadata(session_id, summary=summary, tags=tags)
         except Exception as e:
