@@ -54,10 +54,10 @@ const Sidebar = () => {
     <aside className="fixed left-0 top-0 z-30 flex h-screen w-60 flex-col border-r border-sidebar-border bg-sidebar">
       {/* Logo */}
       <div className="flex items-center gap-2.5 px-5 py-5">
-        <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-          <Bot className="h-4.5 w-4.5 text-primary-foreground" size={18} />
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg overflow-hidden">
+          <img src="/logo.png" alt="CIF-AI" className="h-full w-full object-contain" />
         </div>
-        <span className="text-lg font-semibold text-foreground tracking-tight">AgentOS</span>
+        <span className="text-lg font-semibold text-foreground tracking-tight">CIF-AI</span>
       </div>
 
       {/* Navigation */}

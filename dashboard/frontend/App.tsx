@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "./context/AuthContext";
+import { SearchProvider } from "./context/SearchContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 import DashboardLayout from "./components/layout/DashboardLayout";
 import Login from "./pages/Login";
@@ -35,7 +36,9 @@ const App = () => (
             <Route
               element={
                 <ProtectedRoute>
-                  <DashboardLayout />
+                  <SearchProvider>
+                    <DashboardLayout />
+                  </SearchProvider>
                 </ProtectedRoute>
               }
             >

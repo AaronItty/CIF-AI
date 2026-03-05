@@ -5,8 +5,9 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
 } from "recharts";
 import { useOrgId, useDashboardStats } from "@/hooks/useSupabase";
-import { useEffect } from "react";
-import { generateDailySummary } from "@/lib/reminderTriggers";
+import { useEffect, useMemo } from "react";
+import { generateDailySummary, checkStaleCases } from "@/lib/reminderTriggers";
+import { useSearch } from "@/context/SearchContext";
 
 const statusClass: Record<string, string> = {
   active: "status-open",
@@ -52,14 +53,29 @@ const Dashboard = () => {
   const navigate = useNavigate();
   const { orgId, orgLoaded } = useOrgId();
   const { stats, loading } = useDashboardStats(orgId, orgLoaded);
+  const { searchQuery } = useSearch();
 
   useEffect(() => {
     if (orgId && orgLoaded) {
       generateDailySummary(orgId);
+      checkStaleCases(orgId);
     }
   }, [orgId, orgLoaded]);
 
   const effectiveStats = stats;
+
+  const filteredConversations = useMemo(() => {
+    if (!effectiveStats) return [];
+    if (!searchQuery) return effectiveStats.recentConversations;
+
+    const q = searchQuery.toLowerCase();
+    return effectiveStats.recentConversations.filter((c) => {
+      const nameMatch = c.users?.full_name?.toLowerCase().includes(q);
+      const emailMatch = c.users?.email?.toLowerCase().includes(q);
+      const idMatch = c.id.toLowerCase().includes(q);
+      return nameMatch || emailMatch || idMatch;
+    });
+  }, [effectiveStats, searchQuery]);
 
   const kpiCards = effectiveStats
     ? [
@@ -205,9 +221,9 @@ const Dashboard = () => {
                     <Loader2 className="animate-spin mx-auto" />
                   </td>
                 </tr>
-              ) : effectiveStats && effectiveStats.recentConversations.length > 0 ? (
+              ) : effectiveStats && filteredConversations.length > 0 ? (
                 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-                (effectiveStats.recentConversations as any[]).map((c: any) => (
+                (filteredConversations as any[]).map((c: any) => (
                   <tr
                     key={c.id}
                     className="cursor-pointer border-b last:border-0 transition-colors hover:bg-secondary/30"

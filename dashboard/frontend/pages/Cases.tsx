@@ -1,8 +1,8 @@
 import { useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { Search, Filter, Loader2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
+import { Filter, Loader2 } from "lucide-react";
 import { useOrgId, useConversations } from "@/hooks/useSupabase";
+import { useSearch } from "@/context/SearchContext";
 
 const statusClass: Record<string, string> = {
   active: "status-open",
@@ -40,9 +40,9 @@ const Cases = () => {
   const navigate = useNavigate();
   const { orgId, orgLoaded } = useOrgId();
   const { conversations, loading } = useConversations(orgId, orgLoaded);
+  const { searchQuery } = useSearch();
 
   const [statusFilter, setStatusFilter] = useState("All");
-  const [search, setSearch] = useState("");
 
   // Use sample cases when no real data is available yet
   const effectiveConversations = conversations;
@@ -50,8 +50,8 @@ const Cases = () => {
   const filtered = useMemo(() => {
     return effectiveConversations.filter((c) => {
       if (statusFilter !== "All" && c.status !== statusFilter) return false;
-      if (search) {
-        const q = search.toLowerCase();
+      if (searchQuery) {
+        const q = searchQuery.toLowerCase();
         const nameMatch = c.users?.full_name?.toLowerCase().includes(q);
         const emailMatch = c.users?.email?.toLowerCase().includes(q);
         const idMatch = c.id.toLowerCase().includes(q);
@@ -59,7 +59,7 @@ const Cases = () => {
       }
       return true;
     });
-  }, [effectiveConversations, statusFilter, search]);
+  }, [effectiveConversations, statusFilter, searchQuery]);
 
   return (
     <div className="space-y-6">
@@ -70,15 +70,6 @@ const Cases = () => {
 
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-3">
-        <div className="relative flex-1 max-w-xs">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by customer or ID..."
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            className="h-9 pl-9 bg-card border text-sm"
-          />
-        </div>
         <div className="flex items-center gap-1.5">
           <Filter size={14} className="text-muted-foreground" />
           {DB_STATUSES.map((s) => (

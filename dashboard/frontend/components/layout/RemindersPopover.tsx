@@ -6,6 +6,18 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Link } from "react-router-dom";
 
+const formatTimeAgo = (date: string) => {
+    const seconds = Math.floor((new Date().getTime() - new Date(date).getTime()) / 1000);
+    if (seconds < 60) return "just now";
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m ago`;
+    const hours = Math.floor(minutes / 60);
+    if (hours < 24) return `${hours}h ago`;
+    const days = Math.floor(hours / 24);
+    if (days < 7) return `${days}d ago`;
+    return new Date(date).toLocaleDateString();
+};
+
 const RemindersPopover = () => {
     const { orgId, orgLoaded } = useOrgId();
     const { reminders, loading, markAsRead, markAllAsRead, clearAll } = useReminders(orgId, orgLoaded);
@@ -14,16 +26,16 @@ const RemindersPopover = () => {
 
     const typeIcons = {
         escalation: <AlertCircle className="h-4 w-4 text-destructive" />,
-        system: <Info className="h-4 w-4 text-info" />,
+        system: <Info className="h-4 w-4 text-blue-500" />,
         daily_summary: <Calendar className="h-4 w-4 text-primary" />,
-        priority_case: <Sparkles className="h-4 w-4 text-warning" />,
+        priority_case: <Sparkles className="h-4 w-4 text-amber-500" />,
     };
 
     const typeLabels = {
         escalation: "Escalation",
         system: "System",
-        daily_summary: "Daily Summary",
-        priority_case: "Priority Case",
+        daily_summary: "Digest",
+        priority_case: "Priority",
     };
 
     return (
@@ -118,19 +130,17 @@ const RemindersPopover = () => {
                                     )}
 
                                     <div className="mt-2 flex items-center justify-between">
-                                        <span className="text-[10px] text-muted-foreground">
-                                            {new Date(reminder.created_at).toLocaleDateString() === new Date().toLocaleDateString()
-                                                ? new Date(reminder.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                                : new Date(reminder.created_at).toLocaleDateString()}
+                                        <span className="text-[10px] text-muted-foreground font-medium">
+                                            {formatTimeAgo(reminder.created_at)}
                                         </span>
 
                                         {reminder.link && (
                                             <Link
                                                 to={reminder.link}
-                                                className="flex items-center gap-1 text-[10px] font-medium text-primary hover:underline"
+                                                className="flex items-center gap-1 text-[10px] font-semibold text-primary hover:text-primary/80 transition-colors"
                                                 onClick={() => !reminder.is_read && markAsRead(reminder.id)}
                                             >
-                                                View Details
+                                                View
                                                 <ExternalLink className="h-2.5 w-2.5" />
                                             </Link>
                                         )}
