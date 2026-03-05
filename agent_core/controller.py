@@ -79,27 +79,34 @@ class Controller:
         """
         Decide the next action based on policies and memory.
         Returns one of: 'respond', 'call_tool', 'ask_clarification', 'escalate'.
+        
+        Confidence thresholds:
+          >= 0.85 → call_tool (proceed)
+          0.75–0.85 → ask_clarification (detail what was understood)
+          < 0.75 → escalate to human
         """
-        # 1. Check if we need to escalate based on explicit requests or state loops
+        # 1. Check if we need to escalate based on consecutive failures
         if self.policy_engine.should_escalate(state):
             return "escalate"
             
         action = intent_data.get("action")
+        confidence = intent_data.get("confidence", 0.0)
         
         # 2. If no action (tool) is proposed by LLM, just chat/respond
         if not action or action == "none" or not self.mcp_url:
             if not action or action == "none":
-                # Just to be safe, if confidence is incredibly low even for a basic chat, ask to clarify
-                if not self.policy_engine.evaluate_confidence(intent_data, threshold=0.5):
-                    return "ask_clarification"
+                if confidence < 0.5:
+                    return "escalate"
             return "respond"
             
-        # 3. If a tool is proposed, run strict policy checks
-        # Check Confidence
-        if not self.policy_engine.evaluate_confidence(intent_data, threshold=0.85):
+        # 3. If a tool is proposed, run confidence checks
+        if confidence < 0.75:
+            return "escalate"
+        
+        if confidence < 0.85:
             return "ask_clarification"
             
-        # Check Permissions
+        # 4. Check Permissions
         user_role = state.get("user_role", "customer")
         if not self.policy_engine.check_tool_permission(action, user_role):
             return "escalate" 
@@ -119,6 +126,19 @@ class Controller:
         if action_type == "call_tool":
             tool_name = intent_data.get("action")
             tool_args = intent_data.get("entities", {})
+            
+            # Inject runtime context for tools that need it
+            if tool_name == "escalate_to_human":
+                if "session_id" not in tool_args and "session_id" in context:
+                    tool_args["session_id"] = context["session_id"]
+                if "user_contact" not in tool_args and "user_id" in context:
+                    tool_args["user_contact"] = context["user_id"]
+                if "channel" not in tool_args and "channel" in context:
+                    tool_args["channel"] = context["channel"]
+            
+            # Auto-inject for other tools if they happen to need session_id
+            if "session_id" in context and "session_id" not in tool_args:
+                tool_args["session_id"] = context["session_id"]
             
             # Validate required args before calling the tool
             tool_schema = next((t for t in self._available_tools if t["name"] == tool_name), None)
@@ -160,12 +180,35 @@ class Controller:
                 result["status"] = "error"
                 
         elif action_type == "ask_clarification":
-            # Use the LLM's intent to generate a specific clarification question
+            # Show what the agent understood and ask for confirmation
             intent_desc = intent_data.get("intent", "")
+            action_name = intent_data.get("action", "")
+            entities = intent_data.get("entities", {})
+            
+            # Build a detailed "this is what I understood" message
+            parts = []
             if intent_desc:
-                result["message"] = f"I'd like to help, but I need some more information: {intent_desc}"
+                parts.append(f"Here's what I understood from your message: **{intent_desc}**")
+            if action_name and action_name != "none":
+                parts.append(f"I was planning to use the **{action_name}** tool")
+            if entities:
+                detail_items = [f"  • {k}: {v}" for k, v in entities.items() if v]
+                if detail_items:
+                    parts.append("With these details:\n" + "\n".join(detail_items))
+            
+            if parts:
+                summary = "\n\n".join(parts)
+                result["message"] = (
+                    f"{summary}\n\n"
+                    "Is this what you're looking for, or did you mean something else? "
+                    "Please clarify so I can help you better."
+                )
             else:
-                result["message"] = "Could you tell me more about what you're looking for? I want to make sure I help you with the right thing."
+                result["message"] = (
+                    "I'm not quite sure what you need. Could you rephrase your request? "
+                    "For example, are you looking to search for a product, place an order, "
+                    "or ask about a policy?"
+                )
             
         elif action_type == "escalate":
             # Auto-escalation triggered by PolicyEngine (e.g., 3 consecutive failures).

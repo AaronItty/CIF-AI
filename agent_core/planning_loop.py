@@ -55,9 +55,14 @@ class PlanningLoop:
             if action_result.get("status") == "success":
                 tool_result = action_result.get("tool_result")
                 print(f"[PlanningLoop] Tool '{tool_name}' succeeded on attempt {attempt}")
+                # Reset failure counter on success
+                await self.state_manager.update_session_meta(session_id, "consecutive_tool_failures", 0)
                 break
             else:
                 print(f"[PlanningLoop] Tool '{tool_name}' failed on attempt {attempt}: {action_result.get('tool_result')}")
+                # Increment failure counter
+                current_failures = await self.state_manager.get_session_meta(session_id, "consecutive_tool_failures", 0)
+                await self.state_manager.update_session_meta(session_id, "consecutive_tool_failures", current_failures + 1)
         
         # Log and save to memory
         await self.state_manager.log_tool_usage(session_id, tool_name, tool_args, action_result)
@@ -227,10 +232,12 @@ class PlanningLoop:
         print(f"[DEBUG] PlanningLoop: Loaded {len(memory)} messages from memory for session {session_id}")
         
         # Create a simplified state dict for the Policy Engine evaluation
+        # Load failure counter from session metadata
+        consecutive_failures = await self.state_manager.get_session_meta(session_id, "consecutive_tool_failures", 0)
         eval_state = {
             "user_role": "admin",
             "latest_user_message": message,
-            "consecutive_tool_failures": 0
+            "consecutive_tool_failures": consecutive_failures
         }
         
         # Step 2: Extract Intent ONCE using Groq (with dynamic tool descriptions)
@@ -370,11 +377,11 @@ class PlanningLoop:
                             "I am escalating to support."
                         )
                 
-        elif decision in ["ask_clarification", "escalate"]:
+        elif decision == "ask_clarification":
             # If the LLM wanted buy_item but confidence was low, 
             # run our validation to ask for specific missing fields
             intended_action = intent.get("action", "")
-            if decision == "ask_clarification" and intended_action == "buy_item":
+            if intended_action == "buy_item":
                 entities = intent.get("entities", {})
                 required_fields = {
                     "customer_name": "your full name",
@@ -407,6 +414,16 @@ class PlanningLoop:
                     channel=normalized_msg.channel
                 )
                 final_response_text = action_result.get("message")
+                
+        elif decision == "escalate":
+            # Just execute the escalation action, no buy_item validation
+            action_result = await self.controller.execute_action(
+                decision, intent,
+                session_id=session_id,
+                user_id=normalized_msg.user_id,
+                channel=normalized_msg.channel
+            )
+            final_response_text = action_result.get("message")
             
         elif decision == "respond":
             # Always check KB first before generating a direct response

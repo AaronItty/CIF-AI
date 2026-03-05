@@ -179,26 +179,50 @@ async def escalate_to_human(session_id: str, reason: str, user_contact: str = ""
     try:
         sb = _get_platform_db()
 
+        # Generate a deterministic UUID from the session_id string
+        import uuid
+        def _make_uuid(sid: str) -> str:
+            try:
+                uuid.UUID(sid)
+                return sid
+            except ValueError:
+                return str(uuid.uuid5(uuid.NAMESPACE_OID, str(sid)))
+                
+        db_session_id = _make_uuid(session_id)
+
         # 1. Update conversation status to 'escalated'
-        sb.table("conversations").update({
-            "status": "escalated"
-        }).eq("id", session_id).execute()
+        try:
+            sb.table("conversations").update({
+                "status": "escalated"
+            }).eq("id", db_session_id).execute()
+        except Exception as conv_err:
+            print(f"[Escalation] conversations update warning: {conv_err}")
 
         # 2. Log the escalation
-        sb.table("escalations").insert({
-            "conversation_id": session_id,
-            "reason": reason,
-            "status": "pending_operator"
-        }).execute()
+        try:
+            escalation_data = {
+                "conversation_id": db_session_id,
+                "reason": reason,
+                "status": "pending",
+                "triggered_by": "ai"
+            }
+            if DEFAULT_ORG_ID:
+                escalation_data["organization_id"] = DEFAULT_ORG_ID
+            sb.table("escalations").insert(escalation_data).execute()
+        except Exception as esc_err:
+            print(f"[Escalation] DB insert warning (non-critical): {esc_err}")
 
         # 3. Fetch full conversation history for the email
-        chat_history = sb.table("messages") \
-            .select("role, content, created_at") \
-            .eq("session_id", session_id) \
-            .order("created_at") \
-            .execute()
-        
-        messages = chat_history.data or []
+        messages = []
+        try:
+            chat_history = sb.table("messages") \
+                .select("role, content, created_at") \
+                .eq("session_id", db_session_id) \
+                .order("created_at") \
+                .execute()
+            messages = chat_history.data or []
+        except Exception as msg_err:
+            print(f"[Escalation] Messages fetch warning: {msg_err}")
         
         # 4. Format the conversation log
         log_lines = []
