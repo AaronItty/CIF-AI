@@ -56,13 +56,14 @@ class ReasoningEngine:
 
         system_prompt = (
             "You are an intent extraction engine for a customer service AI agent. "
-            "Analyze the user's input and determine what they want to do. "
+            "Extract user intent, entities, and requested actions from text. "
             "Use your best judgement to decide whether to call a tool, ask for clarification, or respond directly. "
             "When asking for clarification, always specify exactly what information you need — never give vague responses. "
             f"{tool_instruction} "
             f"{user_context_str} "
+            "IMPORTANT: Categorize the conversation into one of these labels: 'Technical Support', 'Billing', 'Sales', 'General Inquiry', 'Escalation'. "
             "You must respond in pure JSON format matching this schema: "
-            '{"intent": "description of intent", "action": "tool_name_or_none", '
+            '{"intent": "description of intent", "category": "one_of_the_labels_above", "action": "tool_name_or_none", '
             '"entities": {"key": "value"}, "confidence": 0.0-1.0}'
         )
         
@@ -143,3 +144,28 @@ class ReasoningEngine:
         )
         
         return response.choices[0].message.content
+
+    async def summarize_conversation(self, context: List[Dict[str, Any]]) -> str:
+        """Generate a one-sentence summary of the conversation history."""
+        if not context:
+            return ""
+            
+        system_prompt = (
+            "Summarize the following conversation in one short, clear sentence. "
+            "Focus on the user's primary goal or issue. Do not use 'The user wants...' or 'This conversation is about...'. "
+            "Example: 'Inquiry regarding billing error on February invoice.'"
+        )
+        
+        # Build message chain for summarization
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in context[-15:]:  # Use last 15 messages for summary
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+
+        response = self.client.chat.completions.create(
+            messages=messages,
+            model=self.chat_model,
+            temperature=0.3, # More focused/stable for summaries
+            max_tokens=60
+        )
+        
+        return response.choices[0].message.content.strip()

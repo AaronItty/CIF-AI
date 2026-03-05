@@ -422,5 +422,17 @@ class PlanningLoop:
             "role": "assistant",
             "content": final_response_text
         })
+        
+        # Step 6: Generate Summary and Persist Metadata
+        try:
+            # Refresh memory to include the latest turn
+            updated_memory = await self.state_manager.get_session_state(session_id)
+            summary = await self.reasoning.summarize_conversation(updated_memory)
+            
+            # Persist summary and tags
+            tags = [category] if (category and category != "one_of_the_labels_above") else None
+            await self.state_manager.update_metadata(session_id, summary=summary, tags=tags)
+        except Exception as e:
+            print(f"[PlanningLoop] Metadata update failed: {e}")
             
         return {"response": final_response_text, "session_id": session_id}

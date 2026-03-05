@@ -123,7 +123,12 @@ const Cases = () => {
                     onClick={() => navigate(`/cases/${c.id}`)}
                   >
                     <td className="px-5 py-3 font-mono text-xs font-medium">{c.id.slice(0, 8)}…</td>
-                    <td className="px-5 py-3">{c.users?.full_name ?? c.users?.email ?? "Anonymous"}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{c.users?.full_name ?? c.users?.email ?? "Anonymous"}</span>
+                        {c.summary && <span className="text-[10px] text-muted-foreground truncate max-w-[200px]">{c.summary}</span>}
+                      </div>
+                    </td>
                     <td className="px-5 py-3 text-muted-foreground capitalize">
                       {c.channels?.display_name ?? c.channels?.type ?? "—"}
                     </td>

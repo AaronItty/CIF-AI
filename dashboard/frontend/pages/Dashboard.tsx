@@ -208,6 +208,7 @@ const Dashboard = () => {
               <tr className="border-b bg-secondary/50">
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Case ID</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Customer</th>
+                <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Msgs</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Channel</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Status</th>
                 <th className="px-5 py-3 text-left text-xs font-medium text-muted-foreground">Confidence</th>
@@ -230,7 +231,17 @@ const Dashboard = () => {
                     onClick={() => navigate(`/cases/${c.id}`)}
                   >
                     <td className="px-5 py-3 font-mono text-xs font-medium">{c.id.slice(0, 8)}…</td>
-                    <td className="px-5 py-3">{c.users?.full_name ?? c.users?.email ?? "—"}</td>
+                    <td className="px-5 py-3">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{c.users?.full_name ?? c.users?.email ?? "—"}</span>
+                        {c.summary && <span className="text-[10px] text-muted-foreground truncate max-w-[150px]">{c.summary}</span>}
+                      </div>
+                    </td>
+                    <td className="px-5 py-3">
+                      <span className="text-xs font-medium bg-secondary/50 px-1.5 py-0.5 rounded">
+                        {c.message_count ?? 0}
+                      </span>
+                    </td>
                     <td className="px-5 py-3 text-muted-foreground capitalize">{c.channels?.type ?? "—"}</td>
                     <td className="px-5 py-3">
                       <span className={`inline-flex rounded-full border px-2.5 py-0.5 text-xs font-medium ${statusClass[c.status] ?? ""}`}>

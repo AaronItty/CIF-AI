@@ -71,7 +71,11 @@ async def get_dashboard_stats(org_id: str):
         for tag in c.get("tags") or []:
             tag_counts[tag] = tag_counts.get(tag, 0) + 1
             
-    colors = ["hsl(24, 85%, 52%)", "hsl(38, 92%, 50%)", "hsl(0, 72%, 51%)", "hsl(217, 91%, 60%)"]
+    # Sample data fallback if no tags yet
+    if not tag_counts:
+        tag_counts = {"General Inquiry": 1, "Billing": 1, "Technical Support": 1, "Sales": 1}
+            
+    colors = ["hsl(24, 85%, 52%)", "hsl(38, 92%, 50%)", "hsl(0, 72%, 51%)", "hsl(217, 91%, 60%)", "hsl(142, 71%, 45%)"]
     intent_distribution = [{"name": k, "value": v, "fill": colors[i % len(colors)]} for i, (k, v) in enumerate(list(tag_counts.items())[:6])]
     
     return {

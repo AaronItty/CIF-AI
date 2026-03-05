@@ -33,3 +33,10 @@ class StateManager:
         }
         # Assuming the repo has or will have a log_tool method
         return await self.repo.log_tool_usage(session_id, log_data)
+    async def update_tags(self, session_id: str, tag: str):
+        """Update conversation tags."""
+        return await self.repo.update_conversation_tags(session_id, tag)
+
+    async def update_metadata(self, session_id: str, summary: str = None, tags: list = None):
+        """Update conversation summary and tags."""
+        return await self.repo.update_conversation_metadata(session_id, summary, tags)

@@ -87,6 +87,17 @@ class ConversationRepository:
         }
             
         resp = self.db.client.table("messages").insert(payload).execute()
+        
+        # 4. Increment MESSAGE_COUNT in Conversation
+        try:
+            self.db.client.rpc("increment_message_count", {"row_id": cid}).execute()
+        except Exception:
+            # Fallback if RPC doesn't exist: fetch and increment manually
+            conv_resp = self.db.client.table("conversations").select("message_count").eq("id", cid).execute()
+            if conv_resp.data:
+                current_count = conv_resp.data[0].get("message_count", 0)
+                self.db.client.table("conversations").update({"message_count": current_count + 1}).eq("id", cid).execute()
+
         return resp.data
         
     async def log_tool_usage(self, session_id: str, log_data: dict):
@@ -101,9 +112,43 @@ class ConversationRepository:
             "result": log_data.get("result", {})
         }
         
+        # Increment tool_call_count
+        try:
+            self.db.client.rpc("increment_tool_call_count", {"row_id": cid}).execute()
+        except Exception:
+            conv_resp = self.db.client.table("conversations").select("tool_call_count").eq("id", cid).execute()
+            if conv_resp.data:
+                current_count = conv_resp.data[0].get("tool_call_count", 0)
+                self.db.client.table("conversations").update({"tool_call_count": current_count + 1}).eq("id", cid).execute()
+
         # Checking if tool_logs table exists or logging to metadata
         try:
             self.db.client.table("tool_logs").insert(payload).execute()
         except Exception:
             pass # Fallback if table doesn't exist yet
         return [payload]
+
+    async def update_conversation_metadata(self, conversation_id: str, summary: str = None, tags: list = None):
+        """Persist summary and tags in the conversations table."""
+        cid = _make_uuid(conversation_id)
+        payload = {}
+        if summary:
+            payload["summary"] = summary
+        if tags is not None:
+            payload["tags"] = tags
+        
+        if payload:
+            self.db.client.table("conversations").update(payload).eq("id", cid).execute()
+            print(f"[ConversationRepo] Updated metadata for {conversation_id}: {payload}")
+    async def update_conversation_tags(self, conversation_id: str, tag: str):
+        """Update tags for a conversation if they don't already exist."""
+        cid = _make_uuid(conversation_id)
+        # Fetch existing tags first
+        resp = self.db.client.table("conversations").select("tags").eq("id", cid).execute()
+        
+        if resp.data:
+            existing_tags = resp.data[0].get("tags") or []
+            if tag not in existing_tags:
+                new_tags = existing_tags + [tag]
+                self.db.client.table("conversations").update({"tags": new_tags}).eq("id", cid).execute()
+                print(f"[ConversationRepo] Updated tags for {conversation_id}: {new_tags}")

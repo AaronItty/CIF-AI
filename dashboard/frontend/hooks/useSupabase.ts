@@ -19,6 +19,7 @@ export interface Conversation {
     escalated_at: string | null;
     resolved_at: string | null;
     message_count: number;
+    summary: string | null;
     users?: { full_name: string | null; email: string | null };
     channels?: { type: string; display_name: string | null };
     messages?: Message[];
