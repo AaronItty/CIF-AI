@@ -73,9 +73,24 @@ class ReasoningEngine:
         print(f"Total raw history messages fetched: {len(context)}")
         print(f"Tools available: {'YES' if tool_descriptions else 'NO'}")
         
-        # Filter context: Keep only past messages, limit to most recent 10
-        past_messages = [m for m in context if m.get("content") != text][-10:]
-        print(f"Messages kept as history (excluding current): {len(past_messages)}")
+        # Filter context: Remove duplicates, keep recent messages
+        # Deduplicate consecutive system messages (old repeated tool results)
+        past_raw = [m for m in context if m.get("content") != text]
+        deduplicated = []
+        seen_system_contents = set()
+        for msg in past_raw:
+            content = msg.get("content", "")
+            role = msg.get("role", "user")
+            if role == "system":
+                # Only keep unique system messages (tool results)
+                content_key = content[:200]  # Use first 200 chars as key
+                if content_key in seen_system_contents:
+                    continue
+                seen_system_contents.add(content_key)
+            deduplicated.append(msg)
+        
+        past_messages = deduplicated[-6:]  # Keep last 6 unique messages
+        print(f"Messages kept as history (excluding current): {len(past_messages)} (from {len(past_raw)} raw)")
         
         for msg in past_messages:
              role = msg.get("role", "user")
@@ -103,7 +118,11 @@ class ReasoningEngine:
         """
         system_prompt = (
             "You are a helpful, conversational AI agent. You have just completed an action on behalf of the user. "
-            "Use the provided tool execution results, the original defined intent, and the conversation history to formulate a polite, human-readable response."
+            "Use the provided tool execution results, the original defined intent, and the conversation history to formulate a polite, human-readable response.\n\n"
+            "IMPORTANT: If 'knowledge_base' content is provided in the tool results, you MUST base your answer primarily on that content. "
+            "Quote or paraphrase the knowledge base information accurately. Do NOT make up information that isn't in the knowledge base. "
+            "If the knowledge base has relevant info, use it to give a clear, helpful answer. "
+            "If no knowledge base results are provided, answer conversationally based on what you know."
         )
         
         # Build message chain with history for the final conversational turn
