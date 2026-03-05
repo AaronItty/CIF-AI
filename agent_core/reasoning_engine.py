@@ -59,6 +59,8 @@ class ReasoningEngine:
             "Extract user intent, entities, and requested actions from text. "
             "Use your best judgement to decide whether to call a tool, ask for clarification, or respond directly. "
             "When asking for clarification, always specify exactly what information you need — never give vague responses. "
+            "If the user is frustrated, asks to speak to a human, or the situation is beyond your capabilities, "
+            "set action to 'escalate_to_human' with a low confidence (e.g. 0.5). "
             f"{tool_instruction} "
             f"{user_context_str} "
             "IMPORTANT: Categorize the conversation into one of these labels: 'Technical Support', 'Billing', 'Sales', 'General Inquiry', 'Escalation'. "
