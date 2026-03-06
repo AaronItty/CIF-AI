@@ -16,23 +16,11 @@ load_dotenv()
 
 mcp = FastMCP("CIF-AI Tools")
 
-# ── Client / External Database (for shopping tools) ────────────
-CLIENT_SUPABASE_URL = os.getenv("CLIENT_SUPABASE_URL")
-CLIENT_SUPABASE_ANON_KEY = os.getenv("CLIENT_SUPABASE_ANON_KEY")
-
 # ── Internal / Platform Database (for escalation, KB, etc.) ────
 OUR_SUPABASE_URL = os.getenv("OUR_SUPABASE_URL")
 OUR_SUPABASE_KEY = os.getenv("OUR_SUPABASE_KEY") or os.getenv("OUR_SUPABASE_ANON_KEY")
 NOMIC_API_KEY = os.getenv("NOMIC_KEY") or os.getenv("NOMIC_API_KEY")
 DEFAULT_ORG_ID = os.getenv("DEFAULT_ORG_ID", "302945a7-2a4b-4b78-a764-daa12777fbaf")
-
-
-def _get_client_db() -> Client:
-    """Returns a Supabase client for the external/client database."""
-    if not CLIENT_SUPABASE_URL or not CLIENT_SUPABASE_ANON_KEY:
-        raise ValueError("CLIENT_SUPABASE_URL and CLIENT_SUPABASE_ANON_KEY must be set in .env")
-    return create_client(CLIENT_SUPABASE_URL, CLIENT_SUPABASE_ANON_KEY)
-
 
 def _get_platform_db() -> Client:
     """Returns a Supabase client for the internal platform database."""
@@ -42,125 +30,11 @@ def _get_platform_db() -> Client:
 
 
 # ═══════════════════════════════════════════════════════════════
-# SHOPPING TOOLS (migrated from shopping_tools.py)
-# ═══════════════════════════════════════════════════════════════
-
-@mcp.tool()
-async def search_item(item_name: str) -> dict:
-    """
-    Search for a product or item by name across all available stores.
-    Returns matching products with store name, price, product_id, and store_id.
-    """
-    try:
-        sb = _get_client_db()
-        products_res = sb.table("products").select("id, name, price, store_id") \
-            .ilike("name", f"%{item_name}%").eq("is_in_stock", True).execute()
-        products = products_res.data
-
-        if not products:
-            return {"status": "success", "results": [], "message": f"No in-stock items found matching '{item_name}'."}
-
-        # Get store names
-        store_ids = list(set([p["store_id"] for p in products if p.get("store_id")]))
-        stores_res = sb.table("stores").select("id, store_name").in_("id", store_ids).execute()
-        stores = {s["id"]: s["store_name"] for s in stores_res.data}
-
-        results = []
-        for p in products:
-            results.append({
-                "product_id": p["id"],
-                "item_name": p["name"],
-                "price": p["price"],
-                "store_id": p["store_id"],
-                "store_name": stores.get(p["store_id"], "Unknown Store")
-            })
-
-        return {"status": "success", "results": results}
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-
-
-@mcp.tool()
-async def buy_item(
-    store_id: str,
-    product_id: str,
-    quantity: int,
-    customer_name: str,
-    customer_phone: str,
-    customer_email: str,
-    pincode: str,
-    delivery_address: Optional[str] = None
-) -> dict:
-    """
-    Place an order to buy a specific product for the customer.
-    Requires store_id and product_id (from search_item results), quantity,
-    customer_name, customer_phone, customer_email, and pincode.
-    delivery_address is optional (defaults to pickup if not provided).
-    Do not use placeholder values like 'unknown' — ask the user for real details first.
-    """
-    try:
-        import httpx
-
-        if not CLIENT_SUPABASE_URL:
-            return {"status": "error", "message": "Supabase URL missing."}
-
-        endpoint = f"{CLIENT_SUPABASE_URL}/functions/v1/Place-Order"
-        headers = {
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {CLIENT_SUPABASE_ANON_KEY}"
-        }
-
-        payload = {
-            "checkout_session_id": str(uuid.uuid4()),
-            "store_id": store_id,
-            "customer": {
-                "name": customer_name,
-                "phone": customer_phone,
-                "email": customer_email
-            },
-            "delivery": {
-                "method": "pickup" if not delivery_address else "delivery",
-                "address": delivery_address,
-                "lat": None, "lng": None, "date": None,
-                "time_slot": None, "pincode": pincode,
-                "landmark": None, "notes": None
-            },
-            "items": [
-                {
-                    "product_id": product_id,
-                    "quantity": quantity,
-                    "variant": None,
-                    "custom_note": "Order placed via AI Agent"
-                }
-            ],
-            "notes": "",
-            "payment_method": "online"
-        }
-
-        async with httpx.AsyncClient() as client:
-            response = await client.post(endpoint, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-
-            return {
-                "status": "success",
-                "payment_link_url": data.get("payment_link_url"),
-                "message": "Order placed successfully. Please review the payment link."
-            }
-
-    except Exception as e:
-        error_body = ""
-        if hasattr(e, 'response') and e.response:
-            error_body = e.response.text
-        return {"status": "error", "message": str(e), "details": error_body}
-
-
-# ═══════════════════════════════════════════════════════════════
 # ESCALATION TOOL
 # ═══════════════════════════════════════════════════════════════
 
 @mcp.tool()
-async def escalate_to_human(session_id: str, reason: str, user_contact: str = "", channel: str = "unknown") -> dict:
+async def escalate_to_human(session_id: str, reason: str, user_contact: str = "", channel: str = "unknown", recipient_email: str = "") -> dict:
     """
     Transfer the current conversation to a human support agent.
     Provide a clear reason summarizing why the conversation is being escalated.
@@ -169,6 +43,11 @@ async def escalate_to_human(session_id: str, reason: str, user_contact: str = ""
     1. Update the conversation status in the database
     2. Log the escalation reason
     3. Send a detailed email notification to the support team
+
+    Examples:
+    - "I want to talk to a real person" -> call escalate_to_human(reason="User requested human support")
+    - "I am tired of talking to a bot" -> call escalate_to_human(reason="User expressed frustration with AI")
+    - "This is useless, help me" -> call escalate_to_human(reason="User found AI unhelpful")
     """
     import httpx
     from datetime import datetime
@@ -269,24 +148,25 @@ async def escalate_to_human(session_id: str, reason: str, user_contact: str = ""
         
         # 6. Send the email via Email Service (port 8003)
         email_sent = False
-        if escalation_email:
+        target_email = recipient_email or escalation_email
+        if target_email:
             try:
                 async with httpx.AsyncClient() as client:
                     resp = await client.post(email_service_url, json={
-                        "recipient_id": escalation_email,
+                        "recipient_id": target_email,
                         "message": body,
                         "subject": subject
                     }, timeout=15.0)
                     
                     if resp.status_code == 200:
                         email_sent = True
-                        print(f"[Escalation] Email sent to {escalation_email}")
+                        print(f"[Escalation] Email sent to {target_email}")
                     else:
                         print(f"[Escalation] Email service returned {resp.status_code}: {resp.text}")
             except Exception as email_err:
                 print(f"[Escalation] Failed to send email notification: {email_err}")
         else:
-            print("[Escalation] No ESCALATION_EMAIL configured, skipping email notification.")
+            print("[Escalation] No escalation email recipient available, skipping notification.")
 
         return {
             "status": "escalated",
@@ -308,6 +188,11 @@ async def get_conversation_history(session_id: str, max_messages: int = 20) -> d
     Use this when the user references something from a previous interaction,
     or when you need context about what was discussed earlier in the conversation.
     Returns the most recent messages (up to max_messages) with role and content.
+    
+    Examples:
+    - "What did I say earlier?" -> call get_conversation_history(...)
+    - "Recall my address from our last talk" -> call get_conversation_history(...)
+    - "What was the product I asked about yesterday?" -> call get_conversation_history(...)
     """
     try:
         sb = _get_platform_db()
@@ -350,6 +235,11 @@ async def query_knowledge_base(query: str) -> dict:
     Use this when the customer asks about policies, FAQs, procedures, shipping,
     returns, store hours, or any information that may be in uploaded documents.
     Returns the most relevant text fragments from the knowledge base.
+    
+    Examples:
+    - "What is your return policy?" -> call query_knowledge_base(query="return policy")
+    - "When does the store close?" -> call query_knowledge_base(query="store hours")
+    - "How do I use the product?" -> call query_knowledge_base(query="product instructions")
     """
     try:
         import requests
@@ -417,3 +307,135 @@ async def query_knowledge_base(query: str) -> dict:
 if __name__ == "__main__":
     print("▶ Starting CIF-AI MCP Tool Server on port 8004...")
     mcp.run(transport="sse", host="0.0.0.0", port=8004)
+
+
+# # ── Client / External Database (for shopping tools) ────────────
+# CLIENT_SUPABASE_URL = os.getenv("CLIENT_SUPABASE_URL")
+# CLIENT_SUPABASE_ANON_KEY = os.getenv("CLIENT_SUPABASE_ANON_KEY")
+
+# def _get_client_db() -> Client:
+#     """Returns a Supabase client for the external/client database."""
+#     if not CLIENT_SUPABASE_URL or not CLIENT_SUPABASE_ANON_KEY:
+#         raise ValueError("CLIENT_SUPABASE_URL and CLIENT_SUPABASE_ANON_KEY must be set in .env")
+#     return create_client(CLIENT_SUPABASE_URL, CLIENT_SUPABASE_ANON_KEY)
+
+# # ═══════════════════════════════════════════════════════════════
+# # SHOPPING TOOLS (migrated from shopping_tools.py)
+# # ═══════════════════════════════════════════════════════════════
+
+# @mcp.tool()
+# async def search_item(item_name: str) -> dict:
+#     """
+#     Search for a product or item by name across all available stores.
+#     Returns matching products with store name, price, product_id, and store_id.
+#     
+#     Examples:
+#     - "Do you have any cakes?" -> call search_item(item_name="cake")
+#     - "List cookies" -> call search_item(item_name="cookies")
+#     """
+#     try:
+#         sb = _get_client_db()
+#         products_res = sb.table("products").select("id, name, price, store_id") \
+#             .ilike("name", f"%{item_name}%").eq("is_in_stock", True).execute()
+#         products = products_res.data
+
+#         if not products:
+#             return {"status": "success", "results": [], "message": f"No in-stock items found matching '{item_name}'."}
+
+#         # Get store names
+#         store_ids = list(set([p["store_id"] for p in products if p.get("store_id")]))
+#         stores_res = sb.table("stores").select("id, store_name").in_("id", store_ids).execute()
+#         stores = {s["id"]: s["store_name"] for s in stores_res.data}
+
+#         results = []
+#         for p in products:
+#             results.append({
+#                 "product_id": p["id"],
+#                 "item_name": p["name"],
+#                 "price": p["price"],
+#                 "store_id": p["store_id"],
+#                 "store_name": stores.get(p["store_id"], "Unknown Store")
+#             })
+
+#         return {"status": "success", "results": results}
+#     except Exception as e:
+#         return {"status": "error", "message": str(e)}
+
+
+# @mcp.tool()
+# async def buy_item(
+#     store_id: str,
+#     product_id: str,
+#     quantity: int,
+#     customer_name: str,
+#     customer_phone: str,
+#     customer_email: str,
+#     pincode: str,
+#     delivery_address: Optional[str] = None
+# ) -> dict:
+#     """
+#     Place an order to buy a specific product for the customer.
+#     Requires store_id and product_id (from search_item results), quantity,
+#     customer_name, customer_phone, customer_email, and pincode.
+#     delivery_address is optional (defaults to pickup if not provided).
+#     Do not use placeholder values like 'unknown' — ask the user for real details first.
+#     
+#     Examples:
+#     - "I want to buy 2 of product x-123 from store s-456" -> call buy_item(...)
+#     - "Complete my order for the cookies" -> call buy_item(...)
+#     """
+#     try:
+#         import httpx
+
+#         if not CLIENT_SUPABASE_URL:
+#             return {"status": "error", "message": "Supabase URL missing."}
+
+#         endpoint = f"{CLIENT_SUPABASE_URL}/functions/v1/Place-Order"
+#         headers = {
+#             "Content-Type": "application/json",
+#             "Authorization": f"Bearer {CLIENT_SUPABASE_ANON_KEY}"
+#         }
+
+#         payload = {
+#             "checkout_session_id": str(uuid.uuid4()),
+#             "store_id": store_id,
+#             "customer": {
+#                 "name": customer_name,
+#                 "phone": customer_phone,
+#                 "email": customer_email
+#             },
+#             "delivery": {
+#                 "method": "pickup" if not delivery_address else "delivery",
+#                 "address": delivery_address,
+#                 "lat": None, "lng": None, "date": None,
+#                 "time_slot": None, "pincode": pincode,
+#                 "landmark": None, "notes": None
+#             },
+#             "items": [
+#                 {
+#                     "product_id": product_id,
+#                     "quantity": quantity,
+#                     "variant": None,
+#                     "custom_note": "Order placed via AI Agent"
+#                 }
+#             ],
+#             "notes": "",
+#             "payment_method": "online"
+#         }
+
+#         async with httpx.AsyncClient() as client:
+#             response = await client.post(endpoint, json=payload, headers=headers)
+#             response.raise_for_status()
+#             data = response.json()
+
+#             return {
+#                 "status": "success",
+#                 "payment_link_url": data.get("payment_link_url"),
+#                 "message": "Order placed successfully. Please review the payment link."
+#             }
+
+#     except Exception as e:
+#         error_body = ""
+#         if hasattr(e, 'response') and e.response:
+#             error_body = e.response.text
+#         return {"status": "error", "message": str(e), "details": error_body}

@@ -142,13 +142,18 @@ class EmailHandler(BaseChannelHandler):
                     
                     print(f"Received new email with ID: {message_info['id']}")
                     
-                    # Extract sender
+                    # Extract sender and headers
                     headers = msg.get('payload', {}).get('headers', [])
                     sender = "unknown"
+                    subject = "Agent Response"
+                    message_id = None
                     for header in headers:
                         if header['name'] == 'From':
                             sender = header['value']
-                            break
+                        elif header['name'] == 'Subject':
+                            subject = header['value']
+                        elif header['name'] == 'Message-ID':
+                            message_id = header['value']
                             
                     # Extract text body
                     body_data = ""
@@ -175,13 +180,21 @@ class EmailHandler(BaseChannelHandler):
                         user_id=sender,
                         session_id=sender,
                         message=text,
-                        channel="email"
+                        channel="email",
+                        metadata={
+                            "subject": subject,
+                            "message_id": message_id
+                        }
                     )
                     
                     response = await self.agent.process_message(normalized)
                     
                     if response and response.get("text"):
-                        await self.send_message(normalized.session_id, response["text"])
+                        await self.send_message(
+                            normalized.session_id, 
+                            response["text"], 
+                            metadata=normalized.metadata
+                        )
                     
                     # Remove UNREAD label to prevent processing again
                     await loop.run_in_executor(
@@ -196,10 +209,12 @@ class EmailHandler(BaseChannelHandler):
         except Exception as e:
             print(f"Error in Gmail listener: {e}")
             
-    async def send_message(self, recipient_id: str, message: str, subject: str = "Agent Response") -> bool:
+    async def send_message(self, recipient_id: str, message: str, subject: str = "Agent Response", metadata: dict = None) -> bool:
         """
         Send an email response using the Gmail API.
+        If metadata is provided with message_id and original subject, reply directly to the thread.
         """
+        metadata = metadata or {}
         if not self.service:
             self.service = self._authenticate()
             if not self.service:
@@ -211,7 +226,21 @@ class EmailHandler(BaseChannelHandler):
             email_msg.set_content(message)
             email_msg['To'] = recipient_id
             email_msg['From'] = 'me'
-            email_msg['Subject'] = subject
+            
+            orig_msg_id = metadata.get('message_id')
+            orig_subject = metadata.get('subject')
+
+            if orig_msg_id and orig_subject:
+                # Format to Re: if not already present
+                if not orig_subject.lower().startswith("re:"):
+                    email_msg['Subject'] = f"Re: {orig_subject}"
+                else:
+                    email_msg['Subject'] = orig_subject
+                    
+                email_msg['In-Reply-To'] = orig_msg_id
+                email_msg['References'] = orig_msg_id
+            else:
+                 email_msg['Subject'] = subject
 
             encoded_message = base64.urlsafe_b64encode(email_msg.as_bytes()).decode()
 

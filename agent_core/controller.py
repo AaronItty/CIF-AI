@@ -99,19 +99,12 @@ class Controller:
                     return "escalate"
             return "respond"
             
-        # 3. If a tool is proposed, run confidence checks
-        if confidence < 0.75:
-            return "escalate"
-        
-        if confidence < 0.85:
-            return "ask_clarification"
+        # 3. Simple binary confidence check to avoid clarification loops
+        if confidence < 0.7:
+             print(f"[Controller] Confidence ({confidence}) below threshold (0.7). Escalating.")
+             return "escalate"
             
-        # 4. Check Permissions
-        user_role = state.get("user_role", "customer")
-        if not self.policy_engine.check_tool_permission(action, user_role):
-            return "escalate" 
-            
-        # Passed all checks -> safe to execute
+        # Passed threshold -> safe to execute
         return "call_tool"
         
     async def execute_action(self, action_type: str, intent_data: Dict[str, Any], **context) -> Dict[str, Any]:
@@ -180,52 +173,39 @@ class Controller:
                 result["status"] = "error"
                 
         elif action_type == "ask_clarification":
-            # Show what the agent understood and ask for confirmation
-            intent_desc = intent_data.get("intent", "")
-            action_name = intent_data.get("action", "")
-            entities = intent_data.get("entities", {})
+            # Simplified conversational clarification
+            intent_desc = intent_data.get("intent", "how I can best help you")
             
-            # Build a detailed "this is what I understood" message
-            parts = []
-            if intent_desc:
-                parts.append(f"Here's what I understood from your message: **{intent_desc}**")
-            if action_name and action_name != "none":
-                parts.append(f"I was planning to use the **{action_name}** tool")
-            if entities:
-                detail_items = [f"  • {k}: {v}" for k, v in entities.items() if v]
-                if detail_items:
-                    parts.append("With these details:\n" + "\n".join(detail_items))
+            # Clean up common patterns like "User is inquiring about..." to be more direct
+            clean_intent = intent_desc.lower()
+            if clean_intent.startswith("user is "):
+                clean_intent = clean_intent.replace("user is ", "", 1)
             
-            if parts:
-                summary = "\n\n".join(parts)
-                result["message"] = (
-                    f"{summary}\n\n"
-                    "Is this what you're looking for, or did you mean something else? "
-                    "Please clarify so I can help you better."
-                )
-            else:
-                result["message"] = (
-                    "I'm not quite sure what you need. Could you rephrase your request? "
-                    "For example, are you looking to search for a product, place an order, "
-                    "or ask about a policy?"
-                )
+            result["message"] = (
+                f"I think you're asking about **{clean_intent}**. Is that correct?\n\n"
+                "Please let me know so I can help you better."
+            )
             
         elif action_type == "escalate":
-            # Auto-escalation triggered by PolicyEngine (e.g., 3 consecutive failures).
-            # We call the MCP escalate_to_human tool so the DB is updated and email is sent.
+            # Auto-escalation triggered by PolicyEngine or PlanningLoop safety check.
             session_id = context.get("session_id", "unknown")
             user_contact = context.get("user_id", "unknown")
             channel = context.get("channel", "unknown")
             
+            entities = intent_data.get("entities", {})
+            reason = entities.get("reason", "Automatic escalation: policy trigger or complex request.")
+            recipient = entities.get("recipient_email", "")
+
             try:
                 from fastmcp import Client
                 
                 async with Client(self.mcp_url) as client:
                     tool_result = await client.call_tool("escalate_to_human", {
                         "session_id": session_id,
-                        "reason": "Automatic escalation: repeated tool failures or policy trigger.",
+                        "reason": reason,
                         "user_contact": user_contact,
-                        "channel": channel
+                        "channel": channel,
+                        "recipient_email": recipient
                     })
                     print(f"[Controller] Auto-escalation MCP result: {tool_result}")
             except Exception as e:
