@@ -1,0 +1,19 @@
+# CIF-AI Project Implementation Methodology
+
+## Slide 1: Core Intelligence Architecture (The "Brain")
+Our methodology centers on a decoupled, agentic architecture that prioritizes reasoning over simple pattern matching.
+
+*   **Agentic Planning Loop**: Implements an "Observe-Orient-Decide-Act" (OODA) cycle. The agent process begins by perceiving user intent, evaluating it against available tools, and executing actions in a continuous loop until the request is resolved.
+*   **Hybrid Reasoning Engine**: Leverages high-speed LLMs (Groq/Llama 3.1) for intent extraction and response generation. Integrated with Whisper Small for seamless voice-to-text processing.
+*   **Knowledge-Augmented Generation (RAG)**: A dedicated Knowledge Base (KB) service ensures the agent remains grounded in organizational data, retrieving relevant context in real-time before providing answers.
+*   **Deterministic Control Layer**: A Policy Engine and Controller act as safety rails, preventing hallucinations by enforcing strict verification steps (e.g., confirming order details) before critical tool executions.
+
+---
+
+## Slide 2: Extensible Framework & Seamless Connectivity
+The system is built for modular growth and multi-platform presence.
+
+*   **Model Context Protocol (MCP)**: Utilizes a pluggable tool server system. This allows developers to add new capabilities (e.g., database search, external API integrations) without modifying the core reasoning logic.
+*   **Multi-Channel Adapters**: A dedicated communication layer normalizes inputs from diverse sources—Telegram bots, Email services, and Web dashboards—into a single "NormalizedMessage" format for the brain.
+*   **Unified Persistence Layer**: Powered by Supabase, ensuring that conversation history, session state, and user metadata are synchronized across all channels.
+*   **Scalable Deployment Model**: The entire ecosystem is containerized via Docker. This ensures environment parity from local development to production and allows for independent scaling of the MCP server, Reasoning Engine, and Frontend.

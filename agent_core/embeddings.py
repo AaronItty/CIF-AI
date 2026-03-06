@@ -3,10 +3,7 @@ import requests
 
 class EmbeddingService:
     def __init__(self, model_name="nomic-embed-text-v1.5"):
-        """
-        Initializes the Embedding Service with the specified model.
-        ✅ STEP 3 — Load Model
-        """
+  
         self.model_name = model_name
         # Note: the .env uses NOMIC_KEY, so we load that one
         self.api_key = os.getenv("NOMIC_KEY") or os.getenv("NOMIC_API_KEY")
