@@ -4,6 +4,7 @@ Handles session memory abstraction over the Supabase backend.
 """
 
 from typing import Dict, Any, List
+import time
 from shared.data_access.conversation_repository import ConversationRepository
 
 class StateManager:
@@ -26,13 +27,23 @@ class StateManager:
 
     async def get_session_meta(self, session_id: str, key: str, default=None):
         """Get a metadata value for a session (in-memory, not persisted to DB)."""
-        return self._session_meta.get(session_id, {}).get(key, default)
+        val = self._session_meta.get(session_id, {}).get(key, default)
+        
+        # Auto-reset failures if the last interaction was > 2 hours ago
+        if key == "consecutive_tool_failures":
+            last_time = self._session_meta.get(session_id, {}).get("last_interaction_time", 0)
+            if time.time() - last_time > 7200: # 2 hours
+                self._session_meta.get(session_id, {})["consecutive_tool_failures"] = 0
+                return 0
+                
+        return val
     
     async def update_session_meta(self, session_id: str, key: str, value):
         """Set a metadata value for a session (in-memory, not persisted to DB)."""
         if session_id not in self._session_meta:
             self._session_meta[session_id] = {}
         self._session_meta[session_id][key] = value
+        self._session_meta[session_id]["last_interaction_time"] = time.time()
 
     async def log_tool_usage(self, session_id: str, tool_name: str, args: dict, result: dict):
         """Log a specific tool execution within the session context."""

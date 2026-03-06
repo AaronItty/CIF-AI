@@ -18,6 +18,7 @@ class SendEmailRequest(BaseModel):
     recipient_id: str
     message: str
     subject: str = "Agent Response"
+    metadata: dict = {}
 
 # Use the existing EmailHandler but patch its agent interaction
 class EmailServiceHandler(EmailHandler):
@@ -58,9 +59,11 @@ class EmailServiceHandler(EmailHandler):
                             lambda m=message_info: self.service.users().messages().get(userId='me', id=m['id']).execute()
                         )
                         
-                        # Extract sender
+                        # Extract headers
                         headers = msg.get('payload', {}).get('headers', [])
                         sender = next((h['value'] for h in headers if h['name'] == 'From'), "unknown")
+                        subject = next((h['value'] for h in headers if h['name'] == 'Subject'), "Agent Response")
+                        message_id = next((h['value'] for h in headers if h['name'] == 'Message-ID'), None)
                         
                         # Extract and decode text body
                         body_data = ""
@@ -87,7 +90,11 @@ class EmailServiceHandler(EmailHandler):
                             "user_id": sender,
                             "session_id": sender,
                             "message": text,
-                            "channel": "email"
+                            "channel": "email",
+                            "metadata": {
+                                "subject": subject,
+                                "message_id": message_id
+                            }
                         }
                         
                         # POST to Agent Core (Layer 2)
@@ -98,7 +105,7 @@ class EmailServiceHandler(EmailHandler):
                             if response.status_code == 200:
                                 agent_data = response.json()
                                 if agent_data.get("response"):
-                                    await self.send_message(sender, agent_data["response"])
+                                    await self.send_message(sender, agent_data["response"], metadata=agent_data.get("metadata", {}))
                             else:
                                 print(f"Agent Core returned error {response.status_code}: {response.text}")
                         except Exception as e:
@@ -130,7 +137,12 @@ async def send_email(req: SendEmailRequest):
     """
     Endpoint for Layer 2 or others to trigger an outgoing email.
     """
-    success = await email_handler_svc.send_message(req.recipient_id, req.message, subject=req.subject)
+    success = await email_handler_svc.send_message(
+        req.recipient_id, 
+        req.message, 
+        subject=req.subject,
+        metadata=req.metadata
+    )
     if not success:
         raise HTTPException(status_code=500, detail="Failed to send email via Gmail API")
     return {"status": "sent"}

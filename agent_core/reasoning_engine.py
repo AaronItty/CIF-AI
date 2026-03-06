@@ -16,9 +16,9 @@ class ReasoningEngine:
     
     def __init__(self, api_key: str):
         self.client = AsyncGroq(api_key=api_key)
-        # Using a fast reasoning model for intent extraction
-        self.intent_model = "llama-3.1-8b-instant" 
-        self.chat_model = "llama-3.1-8b-instant"
+        # Using the latest powerhouse model (Llama 3.3 70B) for superior reasoning
+        self.intent_model = "llama-3.3-70b-versatile" 
+        self.chat_model = "llama-3.3-70b-versatile"
         
     async def extract_intent(self, text: str, context: List[Dict[str, Any]], tool_descriptions: str = "", user_context: dict = None) -> dict:
         """
@@ -48,21 +48,30 @@ class ReasoningEngine:
         # Add user context if available
         user_context_str = ""
         if user_context:
+            past_summary = user_context.pop("past_context_summary", "No past context.")
             user_context_str = (
-                "\nKnown information about the current user: "
+                "\n<PAST_CONTEXT_PROFILE>\n"
+                f"{past_summary}\n"
+                "</PAST_CONTEXT_PROFILE>\n\n"
+                "Known information about the current user (Use this instead of placeholders like 'unknown'):\n"
                 + ", ".join(f"{k}: {v}" for k, v in user_context.items())
-                + ". Use this information when filling in tool parameters instead of using placeholder values like 'unknown'."
             )
 
         system_prompt = (
             "You are an intent extraction engine for a customer service AI agent. "
             "Extract user intent, entities, and requested actions from text. "
-            "Use your best judgement to decide whether to call a tool, ask for clarification, or respond directly. "
-            "When asking for clarification, always specify exactly what information you need — never give vague responses. "
-            "If the user is frustrated, asks to speak to a human, or the situation is beyond your capabilities, "
-            "set action to 'escalate_to_human' with a low confidence (e.g. 0.5). "
+            "Follow this Reasoning Hierarchy for every query:\n"
+            "1. TOOL CALL: If the user action matching an MCP tool, PRIORITIZE the tool. "
+            "2. CLARIFY: If the request is vague or missing required parameters, ask for clarification. "
+            "3. CONTEXT CHECK: If you need to recall something from the past that isn't in your <PAST_CONTEXT_PROFILE>, use the 'get_conversation_history' tool. "
+            "4. RESPONSE/KB: If no tool is needed, provide a helpful direct response. (Your system will automatically inject background knowledge if you choose to respond).\n\n"
             f"{tool_instruction} "
             f"{user_context_str} "
+            "\nCRITICAL INSTRUCTION: Treat the <PAST_CONTEXT_PROFILE> merely as background background info. "
+            "Recent messages in the history are much more important than older ones. "
+            "ONLY extract the intent and tool actions for the CURRENT User message. Do not hallucinate tools failing right now just because they failed in the past context. "
+            "If the user is frustrated, identifies as 'tired of talking to a bot', mentions 'useless', or explicitly asks to speak to a human, "
+            "SET action to 'escalate_to_human' with HIGH confidence (1.0). "
             "IMPORTANT: Categorize the conversation into one of these labels: 'Technical Support', 'Billing', 'Sales', 'General Inquiry', 'Escalation'. "
             "You must respond in pure JSON format matching this schema: "
             '{"intent": "description of intent", "category": "one_of_the_labels_above", "action": "tool_name_or_none", '
@@ -127,6 +136,10 @@ class ReasoningEngine:
         system_prompt = (
             "You are a helpful, conversational AI agent. You have just completed an action on behalf of the user. "
             "Use the provided tool execution results, the original defined intent, and the conversation history to formulate a polite, human-readable response.\n\n"
+            "CLEANLINESS RULES:\n"
+            "1. NEVER show technical internal IDs (like UUIDs for products or stores) to the user. Use the human names instead.\n"
+            "2. Do not explain technical details (like 'calling MCP tool') — just provide the result.\n"
+            "3. Avoid using JSON-like structures in your speech. Speak naturally.\n\n"
             "IMPORTANT: If 'knowledge_base' content is provided in the tool results, you MUST base your answer primarily on that content. "
             "Quote or paraphrase the knowledge base information accurately. Do NOT make up information that isn't in the knowledge base. "
             "If the knowledge base has relevant info, use it to give a clear, helpful answer. "
@@ -187,4 +200,44 @@ class ReasoningEngine:
             print(f"[REASONING] SUMMARIZATION ERROR: {e}", flush=True)
             return "Conversation in progress" # Fail gracefully for summary
 
+        return response.choices[0].message.content.strip()
+
+    async def summarize_detailed_context(self, context: List[Dict[str, Any]]) -> str:
+        """Generate a detailed context profile focusing on intent and user entities."""
+        if not context:
+            return "No previous context."
+            
+        system_prompt = (
+            "You are a context preservation engine. Your job is to read the preceding conversation "
+            "and output a dense, structured Context Profile that summarizes everything that has happened so far.\n"
+            "You MUST extract and retain any specific details provided by the user, such as:\n"
+            "- Full Name\n"
+            "- Email Address\n"
+            "- Phone Number\n"
+            "- Mailing or Physical Address\n"
+            "- Product Names or Order IDs\n\n"
+            "Format your output clearly. For example:\n"
+            "Intent: User is inquiring about store policies.\n"
+            "Entities Known: Name: John Doe, Email: john@example.com.\n"
+            "Do NOT include conversational filler."
+        )
+        
+        # Build message chain for summarization
+        messages = [{"role": "system", "content": system_prompt}]
+        for msg in context[-20:]:  # Use last 20 messages for deep context
+            messages.append({"role": msg.get("role", "user"), "content": msg.get("content", "")})
+        
+        try:
+            print(f"[REASONING] Generating Detailed Context Profile...", flush=True)
+            response = await self.client.chat.completions.create(
+                messages=messages,
+                model=self.chat_model,
+                temperature=0.1, # Highly deterministic for fact extraction
+                max_tokens=250
+            )
+            print(f"[REASONING] Detailed Profile generation complete.", flush=True)
+        except Exception as e:
+            print(f"[REASONING] DETAILED SUMMARIZATION ERROR: {e}", flush=True)
+            return "Context in progress. Some data may have been lost."
+            
         return response.choices[0].message.content.strip()
